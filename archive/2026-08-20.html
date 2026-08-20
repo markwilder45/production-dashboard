@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Production Dashboard — August 20, 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#12161D;--panel:#1B2129;--panel-raised:#212834;--line:#2C3340;
+  --ink:#ECEEF1;--muted:#8B93A1;--muted-dim:#5E6573;
+  --good:#4FB286;--good-dim:#2A4A3D;
+  --warn:#E0A23A;--warn-dim:#4A3B22;
+  --bad:#D9594C;--bad-dim:#4A2B27;
+  --accent:#5B9BD5;--accent-dim:#22344A;
+  --photo:#7B68EE;--photo-dim:#2A2550;
+  --film:#E07B3A;--film-dim:#4A2E1A;
+  --video:#3ABDE0;--video-dim:#1A3A4A;
+  --ops:#9DE03A;--ops-dim:#2C4A1A;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;}
+body{padding:24px 28px 60px;max-width:1400px;margin:0 auto;}
+h1,h2,h3,.oswald,.kpi-value,.kpi-label,.dept-badge,.gap-pill,th,.station-name,.eyebrow,.trend-section-label{font-family:'Oswald',sans-serif;letter-spacing:.02em;}
+table{font-variant-numeric:tabular-nums;}
+header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid var(--line);padding-bottom:16px;margin-bottom:16px;flex-wrap:wrap;gap:12px;}
+.eyebrow{font-size:11px;color:var(--accent);font-weight:600;text-transform:uppercase;letter-spacing:.12em;margin-bottom:5px;}
+h1{font-size:28px;font-weight:600;text-transform:uppercase;}
+.meta-block{text-align:right;color:var(--muted);font-size:13px;}
+.big-date{color:var(--ink);font-size:15px;font-weight:600;font-family:'Oswald',sans-serif;}
+.status-pill{display:inline-flex;align-items:center;gap:8px;padding:5px 13px;border-radius:3px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-top:7px;font-family:'Oswald',sans-serif;}
+.status-pill.bad{background:var(--bad-dim);color:var(--bad);border:1px solid #6b2929;}
+.status-pill.warn{background:var(--warn-dim);color:var(--warn);border:1px solid #6b5429;}
+.status-pill.good{background:var(--good-dim);color:var(--good);border:1px solid #2f6b4a;}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.dot.bad{background:var(--bad);}.dot.warn{background:var(--warn);}.dot.good{background:var(--good);}
+
+.tabbar{display:flex;gap:4px;margin-bottom:22px;border-bottom:1px solid var(--line);}
+.tabbtn{font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:none;border:none;padding:11px 18px;cursor:pointer;border-bottom:3px solid transparent;}
+.tabbtn:hover{color:var(--ink);}
+.tabbtn.active{color:var(--ink);border-bottom-color:var(--accent);}
+.tabpanel{display:none;}
+.tabpanel.active{display:block;}
+
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px;}
+.kpi{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:4px;padding:14px 16px;}
+.kpi.flag-warn{border-top-color:var(--warn);}
+.kpi.flag-bad{border-top-color:var(--bad);}
+.kpi.flag-good{border-top-color:var(--good);}
+.kpi-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:500;margin-bottom:6px;}
+.kpi-value{font-size:28px;font-weight:600;line-height:1;margin-bottom:3px;}
+.kpi-value .unit{font-size:13px;color:var(--muted);font-weight:400;margin-left:3px;}
+.kpi-sub{font-size:11.5px;color:var(--muted-dim);}
+.kpi-sub.warn{color:var(--warn);}.kpi-sub.bad{color:var(--bad);}.kpi-sub.good{color:var(--good);}
+
+.section{margin-bottom:26px;}
+.section-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid var(--line);padding-bottom:7px;flex-wrap:wrap;gap:6px;}
+.section-head h2{font-size:15px;text-transform:uppercase;font-weight:600;}
+.section-sub{font-size:11.5px;color:var(--muted-dim);}
+
+.four-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+.dept-card{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:16px 18px;}
+.dept-card-head{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+.dept-color-bar{width:4px;height:20px;border-radius:2px;flex-shrink:0;}
+.dept-card-head h3{font-size:13px;text-transform:uppercase;font-weight:600;font-family:'Oswald',sans-serif;}
+.pct-bar-track{height:9px;background:#0F1318;border-radius:3px;overflow:hidden;}
+.pct-bar-fill{height:100%;border-radius:3px;}
+.pct-row{display:flex;justify-content:space-between;align-items:baseline;margin-top:5px;margin-bottom:12px;}
+.big-pct{font-family:'Oswald',sans-serif;font-size:24px;font-weight:700;line-height:1;}
+.pct-detail{font-size:11px;color:var(--muted-dim);}
+.absent-block{border-top:1px solid var(--line);padding-top:10px;}
+.absent-title{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500;margin-bottom:6px;}
+.absent-person{display:flex;align-items:center;gap:7px;font-size:12px;padding:3px 0;}
+.absent-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:var(--bad);}
+.a-station{font-size:11px;color:var(--muted-dim);margin-left:auto;}
+.no-absent{font-size:12px;color:var(--good);display:flex;align-items:center;gap:5px;}
+.no-absent::before{content:'\2713';font-weight:700;}
+.sched-note{font-size:11px;color:var(--muted-dim);margin-top:6px;}
+
+.score-card{background:var(--panel);border:1px solid var(--line);border-radius:4px;overflow:hidden;}
+.score-card-head{padding:10px 14px 8px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;}
+.sc-dept{font-size:12px;text-transform:uppercase;font-family:'Oswald',sans-serif;font-weight:600;}
+.dept-score-big{font-family:'Oswald',sans-serif;font-size:22px;font-weight:700;line-height:1;}
+.score-meta{font-size:11.5px;color:var(--muted);padding:5px 14px 7px;border-bottom:1px solid var(--line);display:flex;gap:16px;flex-wrap:wrap;}
+.score-meta b{color:var(--ink);font-weight:600;}
+.score-row{display:flex;justify-content:space-between;align-items:center;padding:6px 14px;border-bottom:1px solid var(--line);font-size:12px;}
+.score-row:last-child{border-bottom:none;}
+.score-name{color:var(--ink);}
+.score-detail{color:var(--muted-dim);font-size:10.5px;}
+.score-pct{font-family:'Oswald',sans-serif;font-size:14px;font-weight:600;white-space:nowrap;margin-left:8px;}
+.score-footer{padding:8px 14px;background:#0F1318;font-size:11px;color:var(--muted-dim);}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:16px;}
+.panel-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.panel-header h3{font-size:13px;text-transform:uppercase;font-weight:600;}
+.dept-badge{font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 7px;border-radius:2px;font-family:'Oswald',sans-serif;letter-spacing:.06em;}
+.badge-photo{background:var(--photo-dim);color:var(--photo);}
+.badge-film{background:var(--film-dim);color:var(--film);}
+.badge-video{background:var(--video-dim);color:var(--video);}
+.badge-ops{background:var(--ops-dim);color:var(--ops);}
+.panel-total{font-size:12px;color:var(--muted);margin-bottom:12px;}
+.panel-total b{color:var(--ink);font-size:16px;font-family:'Oswald',sans-serif;}
+.bucket-row{margin-bottom:10px;}
+.bucket-top{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;}
+.bucket-top .bname{color:var(--muted);}
+.bucket-top .bval{font-weight:600;color:var(--ink);}
+.bar-track{height:7px;background:#0F1318;border-radius:2px;overflow:hidden;display:flex;}
+.bar-fill{height:100%;}
+.b-late{background:var(--bad);}.b-7{background:var(--warn);}.b-14{background:var(--accent);}.b-21{background:var(--muted-dim);}
+.legend-row{display:flex;gap:12px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);flex-wrap:wrap;}
+.legend-item{display:flex;align-items:center;gap:4px;}
+.legend-dot{width:7px;height:7px;border-radius:50%;}
+.alert-inline{font-size:11.5px;padding:5px 10px;border-radius:3px;display:block;margin-top:8px;}
+.alert-inline.bad{background:var(--bad-dim);color:var(--bad);}
+.alert-inline.warn{background:var(--warn-dim);color:var(--warn);}
+.alert-inline.good{background:var(--good-dim);color:var(--good);}
+.ops-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:12px;}
+.ops-row:last-child{border-bottom:none;}
+.ops-flag{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px;flex-shrink:0;}
+.ops-flag.bad{background:var(--bad);}.ops-flag.warn{background:var(--warn);}.ops-flag.ok{background:var(--good);}
+.o-meta{color:var(--muted-dim);font-size:10.5px;}
+.o-hrs{font-family:'Oswald',sans-serif;font-size:13px;font-weight:600;white-space:nowrap;margin-left:8px;}
+
+.week-data-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+.week-card{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:16px 18px;}
+.week-card-title{font-size:11px;text-transform:uppercase;font-family:'Oswald',sans-serif;letter-spacing:.08em;color:var(--muted);margin-bottom:12px;font-weight:500;}
+.week-stat{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--line);font-size:12.5px;}
+.week-stat:last-child{border-bottom:none;}
+.week-stat .ws-label{color:var(--muted);}
+.week-stat .ws-val{font-family:'Oswald',sans-serif;font-weight:600;font-size:14px;color:var(--ink);}
+.week-total{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0 0;margin-top:4px;font-size:13px;font-weight:600;}
+.week-total .wt-label{color:var(--muted);font-family:'Oswald',sans-serif;font-size:12px;text-transform:uppercase;}
+.week-total .wt-val{font-family:'Oswald',sans-serif;font-size:20px;color:var(--ink);}
+.payroll-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:11.5px;}
+.payroll-row:last-child{border-bottom:none;}
+.payroll-name{color:var(--ink);}
+.payroll-hrs{color:var(--muted-dim);font-size:10.5px;}
+.payroll-pay{font-family:'Oswald',sans-serif;font-weight:600;font-size:13px;color:var(--good);}
+
+.action-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.action-panel{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:16px;}
+.action-panel.critical{border-top:2px solid var(--bad);}
+.action-panel.watch{border-top:2px solid var(--warn);}
+.action-panel.info{border-top:2px solid var(--accent);}
+.action-head{display:flex;align-items:center;gap:9px;margin-bottom:11px;}
+.a-icon{font-size:13px;font-family:'Oswald',sans-serif;font-weight:700;width:22px;height:22px;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.a-icon.bad{background:var(--bad-dim);color:var(--bad);}
+.a-icon.warn{background:var(--warn-dim);color:var(--warn);}
+.a-icon.info{background:var(--accent-dim);color:var(--accent);}
+.action-head h3{font-size:13px;text-transform:uppercase;font-weight:600;line-height:1.2;}
+.action-body{font-size:12.5px;color:var(--muted);line-height:1.6;}
+.action-body b{color:var(--ink);}
+.move-names{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;}
+.move-chip{font-size:11px;padding:2px 7px;border-radius:2px;background:var(--accent-dim);color:var(--accent);font-family:'Oswald',sans-serif;font-weight:500;}
+.action-why{font-size:11px;color:var(--muted-dim);margin-top:8px;border-top:1px solid var(--line);padding-top:7px;font-style:italic;}
+
+.trend-wrap{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;}
+.trend-panel{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:18px 20px;}
+.trend-section-label{font-size:11px;color:var(--muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.06em;}
+.tstat{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line);padding-bottom:9px;margin-bottom:9px;}
+.tstat:last-child{border-bottom:none;padding-bottom:0;margin-bottom:0;}
+.tstat .tl{font-size:12px;color:var(--muted);}
+.tstat .tv{font-family:'Oswald',sans-serif;font-size:17px;font-weight:600;}
+.tstat .tv.warn{color:var(--warn);}.tstat .tv.bad{color:var(--bad);}.tstat .tv.good{color:var(--good);}
+.trend-note{font-size:11.5px;color:var(--muted-dim);margin-top:10px;font-style:italic;line-height:1.5;}
+.station-name{font-weight:500;}
+table.cap{width:100%;border-collapse:collapse;}
+table.cap th{position:sticky;top:0;text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500;padding:8px 10px;border-bottom:1px solid var(--line);background:var(--panel-raised);}
+table.cap td{padding:6px 10px;border-bottom:1px solid var(--line);font-size:12px;vertical-align:top;}
+table.cap tr:last-child td{border-bottom:none;}
+table.cap td.nr{text-align:right;font-family:'Oswald',sans-serif;font-weight:500;white-space:nowrap;}
+footer{margin-top:32px;padding-top:14px;border-top:1px solid var(--line);font-size:11px;color:var(--muted-dim);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+@media(max-width:1100px){
+  .kpi-strip,.four-grid,.week-data-grid{grid-template-columns:repeat(2,1fr);}
+  .action-grid{grid-template-columns:1fr 1fr;}
+  .trend-wrap{grid-template-columns:1fr;}
+}
+.capacity-wrap{background:var(--panel);border:1px solid var(--line);border-radius:4px;overflow:hidden;}
+table.cap tr.dept-row td{background:#0F1318;padding:5px 10px;}
+.dept-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-family:'Oswald',sans-serif;}
+.gap-pill{display:inline-block;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;font-family:'Oswald',sans-serif;}
+.gap-pill.bad{background:var(--bad-dim);color:var(--bad);}
+.gap-pill.warn{background:var(--warn-dim);color:var(--warn);}
+.gap-pill.good{background:var(--good-dim);color:var(--good);}
+.train-chips{display:flex;flex-wrap:wrap;gap:3px;}
+.chip{font-size:10px;padding:1px 6px;border-radius:2px;background:#28303C;color:var(--muted);font-family:'Oswald',sans-serif;letter-spacing:.03em;white-space:nowrap;}
+.chip.assigned{background:var(--accent-dim);color:var(--accent);}
+.chip.none{background:transparent;color:var(--muted-dim);font-style:italic;padding-left:0;}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="eyebrow">Production Operations &middot; Daily Dashboard</div>
+    <h1>Floor Status — Thursday</h1>
+  </div>
+  <div class="meta-block">
+    <div class="big-date">August 20, 2026 &middot; Morning Pull</div>
+    <div>Source: Production and Operations Dashboard (Google Sheet)</div>
+    <div class="status-pill warn"><span class="dot warn"></span>Slides are fully caught up (0 late) and focus has shifted to Negatives — but Ops is still down 33 hrs against required coverage, and two Photo staff (Robel, Thomas) are out today without a note explaining it.</div>
+  </div>
+</header>
+
+<div class="tabbar">
+  <button class="tabbtn active" onclick="showTab('tab-today', this)">Today</button>
+  <button class="tabbtn" onclick="showTab('tab-week', this)">Week</button>
+  <button class="tabbtn" onclick="showTab('tab-staffing', this)">Staffing</button>
+  <button class="tabbtn" onclick="showTab('tab-late-orders', this)">Late Orders</button>
+  <button class="tabbtn" onclick="showTab('tab-overview', this)">Overview &amp; AI Insights</button>
+</div>
+
+<div id="tab-today" class="tabpanel active">
+<section class="kpi-strip">
+  <div class="kpi flag-good">
+    <div class="kpi-label">Total Backlog</div>
+    <div class="kpi-value">407,140</div>
+    <div class="kpi-sub">Checked in: 303,472 &middot; Pending WSA: 35,811
+       &middot; -16,792 vs 8/13/2026</div>
+  </div>
+  <div class="kpi flag-good">
+    <div class="kpi-label">Output Surplus vs Inbound</div>
+    <div class="kpi-value">+8,544<span class="unit">/day</span></div>
+    <div class="kpi-sub">Avg 10-day output 24,823 vs avg 10-day inbound 16,279</div>
+  </div>
+  <div class="kpi flag-bad">
+    <div class="kpi-label">Ops Staffing (Present Today)</div>
+    <div class="kpi-value">25.0<span class="unit">hrs</span></div>
+    <div class="kpi-sub">vs 58.17h required &middot; sheet gap -33.2h</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Slides / Photo Late</div>
+    <div class="kpi-value">7,465</div>
+    <div class="kpi-sub">2.5% of 303,472 checked-in units</div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Staffing Status by Department</h2><span class="section-sub">Thursday &middot; Staffing tab</span></div>
+  <div class="four-grid">
+    <div class="dept-card">
+      <div class="dept-card-head"><div class="dept-color-bar" style="background:var(--photo)"></div><h3>Photo</h3></div>
+      <div class="pct-bar-track"><div class="pct-bar-fill" style="width:80.0%;background:var(--warn)"></div></div>
+      <div class="pct-row"><div class="big-pct" style="color:var(--warn)">80%</div><div class="pct-detail">8 of 10 scheduled present</div></div>
+      <div class="absent-block">
+        <div class="absent-title">Absent Today</div>
+        <div class="absent-person"><span class="absent-dot"></span><span>Robel Siamregne</span><span class="a-station">Slides</span></div><div class="absent-person"><span class="absent-dot"></span><span>Thomas Townsend</span><span class="a-station">Paper</span></div>
+        <div class="sched-note">8 of 10 scheduled staff present (80%) — Robel Siamregne (Slides) and Thomas Townsend (Paper) are marked absent today, not called out in the floor notes. Jessika Leiss is split between Slides and Negatives per today&#x27;s reassignment.</div>
+      </div>
+    </div>
+    <div class="dept-card">
+      <div class="dept-card-head"><div class="dept-color-bar" style="background:var(--film)"></div><h3>Film</h3></div>
+      <div class="pct-bar-track"><div class="pct-bar-fill" style="width:100.0%;background:var(--good)"></div></div>
+      <div class="pct-row"><div class="big-pct" style="color:var(--good)">100%</div><div class="pct-detail">3 of 3 scheduled present</div></div>
+      <div class="absent-block">
+        <div class="absent-title">Absent Today</div>
+        <div class="no-absent">No absences — full shift</div>
+        <div class="sched-note">All 3 scheduled staff present; Rob on Film full-shift, Sophie splitting Film/Negatives per today&#x27;s notes.</div>
+      </div>
+    </div>
+    <div class="dept-card">
+      <div class="dept-card-head"><div class="dept-color-bar" style="background:var(--video)"></div><h3>Video</h3></div>
+      <div class="pct-bar-track"><div class="pct-bar-fill" style="width:100.0%;background:var(--good)"></div></div>
+      <div class="pct-row"><div class="big-pct" style="color:var(--good)">100%</div><div class="pct-detail">1 of 1 scheduled present</div></div>
+      <div class="absent-block">
+        <div class="absent-title">Absent Today</div>
+        <div class="no-absent">No absences — full shift</div>
+        <div class="sched-note">Mitchell Beatley present, covering Video solo; queue stays light (875 tapes, none late).</div>
+      </div>
+    </div>
+    <div class="dept-card">
+      <div class="dept-card-head"><div class="dept-color-bar" style="background:var(--ops)"></div><h3>Operations</h3></div>
+      <div class="pct-bar-track"><div class="pct-bar-fill" style="width:100.0%;background:var(--good)"></div></div>
+      <div class="pct-row"><div class="big-pct" style="color:var(--good)">100%</div><div class="pct-detail">3 of 3 scheduled present</div></div>
+      <div class="absent-block">
+        <div class="absent-title">Absent Today</div>
+        <div class="no-absent">No absences — full shift</div>
+        <div class="sched-note">All 3 scheduled present — Trent is back and staffing Shipping full-shift, a big improvement over yesterday&#x27;s call-out. Still, 25.0 hrs scheduled against 58.2 hrs required leaves a 33.2-hr gap.</div>
+      </div>
+    </div></div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Queue Status — All Departments</h2><span class="section-sub">August 20, 2026</span></div>
+  <div class="four-grid">
+    <div class="panel">
+      <div class="panel-header"><h3>Photo Queue</h3><span class="dept-badge badge-photo">Photo</span></div>
+      <div class="panel-total"><b>303,472</b> total units</div>
+      <div class="bucket-row"><div class="bucket-top"><span class="bname">Negative</span>
+          <span class="bval">123,360 &middot; <b style="color:var(--bad)">6,164 late</b></span></div>
+          <div class="bar-track"><div class="bar-fill b-late" style="width:5.0%"></div><div class="bar-fill b-7" style="width:27.3%"></div><div class="bar-fill b-14" style="width:18.8%"></div><div class="bar-fill b-21" style="width:48.9%"></div></div></div><div class="bucket-row"><div class="bucket-top"><span class="bname">Paper</span>
+          <span class="bval">76,274 &middot; <b style="color:var(--bad)">1,257 late</b></span></div>
+          <div class="bar-track"><div class="bar-fill b-late" style="width:1.6%"></div><div class="bar-fill b-7" style="width:1.7%"></div><div class="bar-fill b-14" style="width:5.2%"></div><div class="bar-fill b-21" style="width:91.4%"></div></div></div><div class="bucket-row"><div class="bucket-top"><span class="bname">Slide</span>
+          <span class="bval">101,542 &middot; 0 late</span></div>
+          <div class="bar-track"><div class="bar-fill b-7" style="width:21.4%"></div><div class="bar-fill b-14" style="width:18.6%"></div><div class="bar-fill b-21" style="width:60.0%"></div></div></div><div class="bucket-row"><div class="bucket-top"><span class="bname">Special</span>
+          <span class="bval">2,296 &middot; <b style="color:var(--bad)">44 late</b></span></div>
+          <div class="bar-track"><div class="bar-fill b-late" style="width:1.9%"></div><div class="bar-fill b-7" style="width:14.1%"></div><div class="bar-fill b-14" style="width:10.6%"></div><div class="bar-fill b-21" style="width:73.4%"></div></div></div>
+      <div class="legend-row">
+        <div class="legend-item"><span class="legend-dot" style="background:var(--bad)"></span>Late</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--warn)"></span>0-7d</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--accent)"></span>8-14d</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--muted-dim)"></span>21d+</div>
+      </div>
+      <div class="alert-inline good">Slides: 0 late — fully cleared as of today&#x27;s notes.</div><div class="alert-inline warn">Negatives now the top late bucket: 6,164 late, 33,679 due within 7 days — the largest near-term bucket in Photo.</div><div class="alert-inline good">Paper late count down to 1,257 (from 2,404 two days ago).</div><div class="alert-inline warn">Special: 44 late, 0 output today — no one currently assigned to the station.</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><h3>Film Queue</h3><span class="dept-badge badge-film">Film</span></div>
+      <div class="panel-total"><b>349,567</b> total units</div>
+      <div class="bucket-row"><div class="bucket-top"><span class="bname">Film Capture</span>
+          <span class="bval">114,639 &middot; 0 late</span></div>
+          <div class="bar-track"><div class="bar-fill b-7" style="width:1.2%"></div><div class="bar-fill b-14" style="width:22.4%"></div><div class="bar-fill b-21" style="width:76.4%"></div></div></div><div class="bucket-row"><div class="bucket-top"><span class="bname">Film Splice</span>
+          <span class="bval">115,389 &middot; 0 late</span></div>
+          <div class="bar-track"><div class="bar-fill b-7" style="width:1.9%"></div><div class="bar-fill b-14" style="width:22.2%"></div><div class="bar-fill b-21" style="width:75.9%"></div></div></div><div class="bucket-row"><div class="bucket-top"><span class="bname">Film Edit</span>
+          <span class="bval">119,539 &middot; 0 late</span></div>
+          <div class="bar-track"><div class="bar-fill b-7" style="width:5.3%"></div><div class="bar-fill b-14" style="width:21.4%"></div><div class="bar-fill b-21" style="width:73.3%"></div></div></div>
+      <div class="legend-row">
+        <div class="legend-item"><span class="legend-dot" style="background:var(--bad)"></span>Late</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--warn)"></span>0-7d</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--accent)"></span>8-14d</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--muted-dim)"></span>21d+</div>
+      </div>
+      <div class="alert-inline good">Film has zero late units across Capture, Splice, and Edit.</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><h3>Video Queue</h3><span class="dept-badge badge-video">Video</span></div>
+      <div class="panel-total"><b>875</b> tapes &middot; <b style="color:var(--good)">0 lates</b></div>
+      <div class="vtype-row" style="display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0;border-bottom:1px solid var(--line);"><span>Hi8</span><span>178 &middot; 0 due &le;7d</span></div><div class="vtype-row" style="display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0;border-bottom:1px solid var(--line);"><span>VHS</span><span>277 &middot; 1 due &le;7d</span></div><div class="vtype-row" style="display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0;border-bottom:1px solid var(--line);"><span>VHS-C</span><span>85 &middot; 0 due &le;7d</span></div><div class="vtype-row" style="display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0;border-bottom:1px solid var(--line);"><span>Mini-DV</span><span>237 &middot; 0 due &le;7d</span></div><div class="vtype-row" style="display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0;border-bottom:1px solid var(--line);"><span>Audio</span><span>95 &middot; 1 due &le;7d</span></div><div class="vtype-row" style="display:flex;justify-content:space-between;font-size:11.5px;padding:3px 0;border-bottom:1px solid var(--line);"><span>Other</span><span>3 &middot; 0 due &le;7d</span></div>
+      <div class="alert-inline good" style="margin-top:8px;">2 tapes due within 7 days</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><h3>Operations Queue</h3><span class="dept-badge badge-ops">Ops</span></div>
+      <div class="panel-total"><b style="color:var(--bad)">58.17h required</b> &middot; 25.0h present</div>
+      <div class="ops-row"><div><span class="ops-flag bad"></span><b style="font-size:12.5px;">Shipping</b>
+          <div class="o-meta">139 orders &middot; oldest 31-Jul</div></div>
+          <span class="o-hrs" style="color:var(--bad);">11.58h</span></div><div class="ops-row"><div><span class="ops-flag warn"></span><b style="font-size:12.5px;">Upcoming Shipping (Loading + Matching)</b>
+          <div class="o-meta">106 orders &middot; oldest 20-Aug</div></div>
+          <span class="o-hrs" style="color:var(--warn);">8.83h</span></div><div class="ops-row"><div><span class="ops-flag warn"></span><b style="font-size:12.5px;">Non-Rush Check-In Photo</b>
+          <div class="o-meta">40 orders</div></div>
+          <span class="o-hrs" style="color:var(--warn);">8.00h</span></div><div class="ops-row"><div><span class="ops-flag warn"></span><b style="font-size:12.5px;">Final Check</b>
+          <div class="o-meta">42 orders &middot; oldest 19-Aug</div></div>
+          <span class="o-hrs" style="color:var(--warn);">5.25h</span></div><div class="ops-row"><div><span class="ops-flag warn"></span><b style="font-size:12.5px;">Tickets</b>
+          <div class="o-meta">44 orders</div></div>
+          <span class="o-hrs" style="color:var(--warn);">3.67h</span></div><div class="ops-row"><div><span class="ops-flag warn"></span><b style="font-size:12.5px;">Non-Rush Check-In Video</b>
+          <div class="o-meta">16 orders</div></div>
+          <span class="o-hrs" style="color:var(--warn);">3.20h</span></div><div class="ops-row"><div><span class="ops-flag ok"></span><b style="font-size:12.5px;">Matching</b>
+          <div class="o-meta">80 orders &middot; oldest 29-Jul</div></div>
+          <span class="o-hrs" style="color:var(--good);">1.60h</span></div><div class="ops-row"><div><span class="ops-flag ok"></span><b style="font-size:12.5px;">Video Review (Assigning)</b>
+          <div class="o-meta">9 orders &middot; oldest 19-Aug</div></div>
+          <span class="o-hrs" style="color:var(--good);">0.60h</span></div><div class="ops-row"><div><span class="ops-flag ok"></span><b style="font-size:12.5px;">Video Review (Verification)</b>
+          <div class="o-meta">0 orders &middot; oldest 20-Aug</div></div>
+          <span class="o-hrs" style="color:var(--good);">0.60h</span></div>
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted);">
+        Gap (present staff): <b style="color:var(--bad);">-33.2h (sheet)</b>
+      </div>
+    </div></div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Yesterday's Performance Scores</h2><span class="section-sub">Yesterday Scores tab</span></div>
+  <div class="four-grid">
+    <div class="score-card">
+      <div class="score-card-head"><span class="sc-dept" style="color:var(--photo)">Photo</span>
+        <span class="dept-score-big" style="color:var(--warn)">92%</span></div>
+      <div class="score-meta"><span>Attendance <b>114%</b></span><span>Output <b>26,232</b></span></div>
+      <div class="score-row"><div class="score-left"><div class="score-name">Jessika Leiss</div>
+              <div class="score-detail">7.98h sched &middot; 13.58h actual</div></div>
+              <div class="score-pct" style="color:var(--good)">170%</div></div><div class="score-row"><div class="score-left"><div class="score-name">Hyon Seok</div>
+              <div class="score-detail">4.38h sched &middot; 5.20h actual</div></div>
+              <div class="score-pct" style="color:var(--good)">119%</div></div><div class="score-row"><div class="score-left"><div class="score-name">Jessica Spear</div>
+              <div class="score-detail">0.41h sched &middot; 0.47h actual</div></div>
+              <div class="score-pct" style="color:var(--good)">115%</div></div><div class="score-row"><div class="score-left"><div class="score-name">Thomas Townsend</div>
+              <div class="score-detail">7.68h sched &middot; 8.23h actual</div></div>
+              <div class="score-pct" style="color:var(--good)">107%</div></div><div class="score-row"><div class="score-left"><div class="score-name">Jea Seok</div>
+              <div class="score-detail">10.69h sched &middot; 10.91h actual</div></div>
+              <div class="score-pct" style="color:var(--good)">102%</div></div><div class="score-row"><div class="score-left"><div class="score-name">Ivan Martinez</div>
+              <div class="score-detail">7.66h sched &middot; 7.27h actual</div></div>
+              <div class="score-pct" style="color:var(--warn)">95%</div></div><div class="score-row"><div class="score-left"><div class="score-name">Robel Siamregne</div>
+              <div class="score-detail">7.64h sched &middot; 6.35h actual</div></div>
+              <div class="score-pct" style="color:var(--bad)">83%</div></div><div class="score-row"><div class="score-left"><div class="score-name">Jodi Aleshire</div>
+              <div class="score-detail">7.66h sched &middot; 5.58h actual</div></div>
+              <div class="score-pct" style="color:var(--bad)">73%</div></div><div class="score-row"><div class="score-left"><div class="score-name">Michal Scherer-Berry</div>
+              <div class="score-detail">6.09h sched &middot; 3.70h actual</div></div>
+              <div class="score-pct" style="color:var(--bad)">61%</div></div><div class="score-row"><div class="score-left"><div class="score-name">Edward Parrish</div>
+              <div class="score-detail">15.62h sched &middot; 8.50h actual</div></div>
+              <div class="score-pct" style="color:var(--bad)">54%</div></div>
+      <div class="score-footer">114% attendance but only 92% score yesterday — Edward Parrish ran well under plan (54%) while Jessika Leiss ran hot (170%).</div>
+    </div>
+    <div class="score-card">
+      <div class="score-card-head"><span class="sc-dept" style="color:var(--film)">Film</span>
+        <span class="dept-score-big" style="color:var(--warn)">94%</span></div>
+      <div class="score-meta"><span>Attendance <b>103%</b></span><span>Output <b>5,625</b></span></div>
+      <div class="score-row"><div class="score-left"><div class="score-name">Sophie Worthman</div>
+              <div class="score-detail">7.71h sched &middot; 7.75h actual</div></div>
+              <div class="score-pct" style="color:var(--good)">101%</div></div><div class="score-row"><div class="score-left"><div class="score-name">Rob Hall</div>
+              <div class="score-detail">8.05h sched &middot; 7.02h actual</div></div>
+              <div class="score-pct" style="color:var(--warn)">87%</div></div>
+      <div class="score-footer">103% attendance, 94% score; Sophie Worthman and Rob Hall both landed close to 100% of scheduled pace.</div>
+    </div>
+    <div class="score-card">
+      <div class="score-card-head"><span class="sc-dept" style="color:var(--video)">Video</span>
+        <span class="dept-score-big" style="color:var(--good)">105%</span></div>
+      <div class="score-meta"><span>Attendance <b>98%</b></span><span>Output <b>153</b></span></div>
+      <div class="score-row"><div class="score-left"><div class="score-name">Mitchell Beatley</div>
+              <div class="score-detail">7.85h sched &middot; 8.22h actual</div></div>
+              <div class="score-pct" style="color:var(--good)">105%</div></div>
+      <div class="score-footer">98% attendance, 105% score — Mitchell Beatley slightly exceeded his scheduled hours.</div>
+    </div>
+    <div class="score-card">
+      <div class="score-card-head"><span class="sc-dept" style="color:var(--ops)">Operations</span>
+        <span class="dept-score-big" style="color:var(--warn)">89%</span></div>
+      <div class="score-meta"><span>Attendance <b>57%</b></span></div>
+      <div class="score-row"><div class="score-left"><div class="score-name">Anita Frost</div>
+              <div class="score-detail">6.66h sched &middot; 6.47h actual</div></div>
+              <div class="score-pct" style="color:var(--warn)">97%</div></div><div class="score-row"><div class="score-left"><div class="score-name">Kian Aleman</div>
+              <div class="score-detail">7.59h sched &middot; 6.45h actual</div></div>
+              <div class="score-pct" style="color:var(--warn)">85%</div></div>
+      <div class="score-footer">Attendance dipped to 57% yesterday with a 89% score; Kian&#x27;s Reception time ran hot (171%) while his Check-In ran under (81%).</div>
+    </div></div>
+</section>
+</div>
+<div id="tab-week" class="tabpanel">
+<section class="section">
+  <div class="section-head"><h2>Week at a Glance</h2><span class="section-sub">Week Data tab &middot; full breakdown</span></div>
+  <div class="week-data-grid">
+    <div class="week-card"><div class="week-card-title">This Week — Inbound Media (so far)</div><div class="week-stat"><span class="ws-label">Photo</span><span class="ws-val">5,145</span></div><div class="week-stat"><span class="ws-label">Negatives</span><span class="ws-val">10,877</span></div><div class="week-stat"><span class="ws-label">Slides</span><span class="ws-val">200</span></div><div class="week-stat"><span class="ws-label">Special</span><span class="ws-val">1</span></div><div class="week-stat"><span class="ws-label">Film</span><span class="ws-val">2,151</span></div><div class="week-stat"><span class="ws-label">Video</span><span class="ws-val">195</span></div>
+      <div style="margin-top:8px;font-size:11px;color:var(--muted-dim);">80 orders &middot; $22,596 gross</div></div>
+    <div class="week-card"><div class="week-card-title">Last Week — Pieces Made Online</div><div class="week-stat"><span class="ws-label">Negatives</span><span class="ws-val">9,805</span></div><div class="week-stat"><span class="ws-label">Paper</span><span class="ws-val">27,508</span></div><div class="week-stat"><span class="ws-label">Slides</span><span class="ws-val">26,891</span></div><div class="week-stat"><span class="ws-label">Special</span><span class="ws-val">504</span></div>
+      <div class="week-total"><span class="wt-label">Photo Total</span><span class="wt-val">64,708</span></div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-dim);">By Department</div>
+      <div class="week-stat"><span class="ws-label">Photo</span><span class="ws-val">64,708</span></div><div class="week-stat"><span class="ws-label">Film</span><span class="ws-val">24,560</span></div><div class="week-stat"><span class="ws-label">Video</span><span class="ws-val">1,035</span></div>
+      <div class="week-total"><span class="wt-label">Total Output</span><span class="wt-val">90,303</span></div></div>
+    <div class="week-card"><div class="week-card-title">Last Week — Revenue by Media</div><div class="week-stat"><span class="ws-label">Standard</span><span class="ws-val good">$59,644</span></div><div class="week-stat"><span class="ws-label">Special</span><span class="ws-val good">$4,158</span></div><div class="week-stat"><span class="ws-label">Video</span><span class="ws-val good">$16,912</span></div><div class="week-stat"><span class="ws-label">Film</span><span class="ws-val good">$6,746</span></div>
+      <div class="week-total"><span class="wt-label">Total Revenue</span><span class="wt-val" style="color:var(--good)">$87,460</span></div></div>
+    <div class="week-card"><div class="week-card-title">Last Week — Department Hours</div><div class="week-stat"><span class="ws-label">Operations</span><span class="ws-val">88.60h</span></div><div class="week-stat"><span class="ws-label">Photo</span><span class="ws-val">359.59h</span></div><div class="week-stat"><span class="ws-label">Film</span><span class="ws-val">36.59h</span></div><div class="week-stat"><span class="ws-label">Video</span><span class="ws-val">29.27h</span></div><div class="week-stat"><span class="ws-label">Lead</span><span class="ws-val">34.42h</span></div></div>
+    <div class="week-card"><div class="week-card-title">Last Week — Order Late Rate</div><div class="week-stat"><span class="ws-label">On-Time Orders</span><span class="ws-val good">80</span></div><div class="week-stat"><span class="ws-label">Late Orders</span><span class="ws-val warn">42</span></div><div class="week-stat"><span class="ws-label">Total Orders</span><span class="ws-val ">122</span></div><div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-dim);">Rate</div><div class="week-stat"><span class="ws-label">On-Time Orders %</span><span class="ws-val good">65.6%</span></div><div class="week-stat"><span class="ws-label">Late Orders %</span><span class="ws-val warn">34.4%</span></div><div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-dim);">Day Count vs Estimated TAT</div><div class="week-stat"><span class="ws-label">Late Orders — Avg Days vs Est. TAT</span><span class="ws-val">10.15</span></div><div class="week-stat"><span class="ws-label">On-Time Orders — Avg Days vs Est. TAT</span><span class="ws-val">-22.55</span></div><div class="week-stat"><span class="ws-label">Overall Average — Days vs Est. TAT</span><span class="ws-val">-4.59</span></div><div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-dim);">By Order Prefix</div><div class="week-stat"><span class="ws-label">W-Orders</span><span class="ws-val">8</span></div><div class="week-stat"><span class="ws-label">K-Orders</span><span class="ws-val">23</span></div><div class="week-stat"><span class="ws-label">H-Orders</span><span class="ws-val">5</span></div><div class="week-stat"><span class="ws-label">S-Orders</span><span class="ws-val">7</span></div><div class="week-stat"><span class="ws-label">R-Orders</span><span class="ws-val">6</span></div></div>
+    <div class="week-card" style="grid-column:span 3;"><div class="week-card-title">Last Week — Payroll (full)</div>
+      <div style="max-height:340px;overflow-y:auto;padding-right:10px;"><div class="payroll-row"><div><div class="payroll-name">Jea Seok</div><div class="payroll-hrs">40.02h</div></div><div class="payroll-pay">$730</div></div><div class="payroll-row"><div><div class="payroll-name">Jessica Spear</div><div class="payroll-hrs">40.48h</div></div><div class="payroll-pay">$729</div></div><div class="payroll-row"><div><div class="payroll-name">Sophie Worthman</div><div class="payroll-hrs">40.03h</div></div><div class="payroll-pay">$650</div></div><div class="payroll-row"><div><div class="payroll-name">Rob Hall</div><div class="payroll-hrs">40.03h</div></div><div class="payroll-pay">$600</div></div><div class="payroll-row"><div><div class="payroll-name">Kian Aleman</div><div class="payroll-hrs">40.22h</div></div><div class="payroll-pay">$583</div></div><div class="payroll-row"><div><div class="payroll-name">Jessika Leiss</div><div class="payroll-hrs">40.00h</div></div><div class="payroll-pay">$580</div></div><div class="payroll-row"><div><div class="payroll-name">Trent Bredahl</div><div class="payroll-hrs">29.80h</div></div><div class="payroll-pay">$566</div></div><div class="payroll-row"><div><div class="payroll-name">Robel Siamregne</div><div class="payroll-hrs">40.11h</div></div><div class="payroll-pay">$562</div></div><div class="payroll-row"><div><div class="payroll-name">Edward Parrish</div><div class="payroll-hrs">40.02h</div></div><div class="payroll-pay">$520</div></div><div class="payroll-row"><div><div class="payroll-name">Ivan Martinez</div><div class="payroll-hrs">40.01h</div></div><div class="payroll-pay">$520</div></div><div class="payroll-row"><div><div class="payroll-name">Michal Scherer-Berry</div><div class="payroll-hrs">36.10h</div></div><div class="payroll-pay">$505</div></div><div class="payroll-row"><div><div class="payroll-name">Thomas Townsend</div><div class="payroll-hrs">31.98h</div></div><div class="payroll-pay">$472</div></div><div class="payroll-row"><div><div class="payroll-name">Jodi Aleshire</div><div class="payroll-hrs">32.75h</div></div><div class="payroll-pay">$426</div></div><div class="payroll-row"><div><div class="payroll-name">Anita Frost</div><div class="payroll-hrs">20.93h</div></div><div class="payroll-pay">$324</div></div><div class="payroll-row"><div><div class="payroll-name">Mitchell Beatley</div><div class="payroll-hrs">20.59h</div></div><div class="payroll-pay">$278</div></div><div class="payroll-row"><div><div class="payroll-name">Hyon Seok</div><div class="payroll-hrs">17.76h</div></div><div class="payroll-pay">$253</div></div></div>
+      <div class="week-total"><span class="wt-label">Total</span><span class="wt-val">550.8h &middot; $8,299</span></div></div>
+  </div>
+</section>
+</div>
+<div id="tab-staffing" class="tabpanel">
+<section class="section">
+  <div class="section-head"><h2>Station Capacity &amp; Coverage Detail</h2><span class="section-sub">Staffed today &middot; cross-training &middot; output rate &middot; queue &amp; age status</span></div>
+  <div class="capacity-wrap">
+    <table class="cap">
+      <thead><tr>
+        <th style="width:4px;padding:8px 4px;"></th>
+        <th>Station</th><th>Assigned Today</th><th>Cross-Trained Backup</th>
+        <th class="nr">Output/Day</th><th class="nr">Queue &amp; Status</th><th>Flag</th>
+      </tr></thead>
+      <tbody><tr class="dept-row"><td colspan="6"><span class="dept-label" style="color:var(--photo)">Photo</span></td></tr><tr>
+              <td></td><td class="station-name">Negatives</td>
+              <td><div class="train-chips"><span class="chip assigned">Hyon Seok (5.00h)</span><span class="chip assigned">Jea Seok (7.67h)</span><span class="chip assigned">Jessika Leiss (3.83h)</span><span class="chip assigned">Jodi Aleshire (7.67h)</span><span class="chip assigned">Michal Scherer-Berry (7.67h)</span></div></td>
+              <td><div class="train-chips"><span class="chip">Rob Hall</span><span class="chip">Sophie Worthman</span><span class="chip">Thomas Townsend</span></div></td>
+              <td class="nr">11,095</td>
+              <td class="nr">123,360 &middot; <b style="color:var(--bad)">6,164 late</b> &middot; 33,679 due &le;7d</td>
+              <td><span class="gap-pill warn">Watch</span></td>
+            </tr><tr>
+              <td></td><td class="station-name">Slides</td>
+              <td><div class="train-chips"><span class="chip assigned">Jessika Leiss (3.83h)</span></div></td>
+              <td><div class="train-chips"><span class="chip">Jea Seok</span><span class="chip">Rob Hall</span><span class="chip">Robel Siamregne</span><span class="chip">Sophie Worthman</span></div></td>
+              <td class="nr">4,152</td>
+              <td class="nr">101,542 &middot; 0 late &#x2713; &middot; 21,772 due &le;7d</td>
+              <td><span class="gap-pill warn">Watch</span></td>
+            </tr><tr>
+              <td></td><td class="station-name">Paper</td>
+              <td><div class="train-chips"><span class="chip assigned">Edward Parrish (7.67h)</span><span class="chip assigned">Ivan Martinez (7.67h)</span></div></td>
+              <td><div class="train-chips"><span class="chip">Anita Frost</span><span class="chip">Hyon Seok</span><span class="chip">Jea Seok</span><span class="chip">Jessica Spear</span><span class="chip">Jessika Leiss</span><span class="chip">Jodi Aleshire</span><span class="chip">Michal Scherer-Berry</span><span class="chip">Rob Hall</span><span class="chip">Robel Siamregne</span><span class="chip">Sophie Worthman</span><span class="chip">Thomas Townsend</span><span class="chip">Trent Bredahl</span></div></td>
+              <td class="nr">8,744</td>
+              <td class="nr">76,274 &middot; <b style="color:var(--bad)">1,257 late</b> &middot; 1,322 due &le;7d</td>
+              <td><span class="gap-pill warn">Watch</span></td>
+            </tr><tr>
+              <td></td><td class="station-name">Special</td>
+              <td><div class="train-chips"><span class="chip none">Unassigned</span></div></td>
+              <td><div class="train-chips"><span class="chip">Jea Seok</span><span class="chip">Jessica Spear</span><span class="chip">Jessika Leiss</span><span class="chip">Sophie Worthman</span></div></td>
+              <td class="nr">0</td>
+              <td class="nr">2,296 &middot; <b style="color:var(--bad)">44 late</b> &middot; 324 due &le;7d</td>
+              <td><span class="gap-pill warn">Watch</span></td>
+            </tr><tr class="dept-row"><td colspan="6"><span class="dept-label" style="color:var(--film)">Film</span></td></tr><tr>
+              <td></td><td class="station-name">Film Edit</td>
+              <td><div class="train-chips"><span class="chip assigned">Sophie Worthman (7.67h)</span></div></td>
+              <td><div class="train-chips"><span class="chip none">No backup identified</span></div></td>
+              <td class="nr">10,930</td>
+              <td class="nr">119,539 &middot; 0 late &#x2713; &middot; 6,300 due &le;7d</td>
+              <td><span class="gap-pill good">Stable</span></td>
+            </tr><tr>
+              <td></td><td class="station-name">Film Splice</td>
+              <td><div class="train-chips"><span class="chip assigned">Rob Hall (3.83h)</span></div></td>
+              <td><div class="train-chips"><span class="chip">Sophie Worthman</span></div></td>
+              <td class="nr">5,458</td>
+              <td class="nr">115,389 &middot; 0 late &#x2713; &middot; 2,150 due &le;7d</td>
+              <td><span class="gap-pill good">Stable</span></td>
+            </tr><tr>
+              <td></td><td class="station-name">Film Capture</td>
+              <td><div class="train-chips"><span class="chip assigned">Rob Hall (3.83h)</span></div></td>
+              <td><div class="train-chips"><span class="chip">Sophie Worthman</span></div></td>
+              <td class="nr">6,549</td>
+              <td class="nr">114,639 &middot; 0 late &#x2713; &middot; 1,400 due &le;7d</td>
+              <td><span class="gap-pill good">Stable</span></td>
+            </tr><tr class="dept-row"><td colspan="6"><span class="dept-label" style="color:var(--video)">Video</span></td></tr><tr>
+              <td></td><td class="station-name">Video (all formats)</td>
+              <td><div class="train-chips"><span class="chip assigned">Mitchell Beatley (8.00h)</span></div></td>
+              <td><div class="train-chips"><span class="chip">Anita Frost</span><span class="chip">Kian Aleman</span><span class="chip">Sophie Worthman</span><span class="chip">Thomas Townsend</span></div></td>
+              <td class="nr">119</td>
+              <td class="nr">875 &middot; 0 late &#x2713; &middot; 2 due &le;7d</td>
+              <td><span class="gap-pill good">Stable</span></td>
+            </tr><tr class="dept-row"><td colspan="6"><span class="dept-label" style="color:var(--ops)">Operations</span></td></tr><tr>
+              <td></td><td class="station-name">Shipping (priority)</td>
+              <td><div class="train-chips"><span class="chip assigned">Kian Aleman (7.67h)</span><span class="chip assigned">Anita Frost (7.67h)</span><span class="chip assigned">Trent Bredahl (9.67h)</span></div></td>
+              <td><div class="train-chips"><span class="chip none">No backup identified</span></div></td>
+              <td class="nr">—</td>
+              <td class="nr">245 orders &middot; 20.41h required</td>
+              <td><span class="gap-pill warn">Watch</span></td>
+            </tr><tr>
+              <td></td><td class="station-name">Final Check + Video Review</td>
+              <td><div class="train-chips"><span class="chip assigned">Kian Aleman (7.67h)</span><span class="chip assigned">Anita Frost (7.67h)</span><span class="chip assigned">Trent Bredahl (9.67h)</span></div></td>
+              <td><div class="train-chips"><span class="chip none">No backup identified</span></div></td>
+              <td class="nr">—</td>
+              <td class="nr">51 orders &middot; 6.45h required</td>
+              <td><span class="gap-pill warn">Watch</span></td>
+            </tr><tr>
+              <td></td><td class="station-name">Check-In + Matching + Tickets</td>
+              <td><div class="train-chips"><span class="chip assigned">Kian Aleman (7.67h)</span><span class="chip assigned">Anita Frost (7.67h)</span><span class="chip assigned">Trent Bredahl (9.67h)</span></div></td>
+              <td><div class="train-chips"><span class="chip none">No backup identified</span></div></td>
+              <td class="nr">—</td>
+              <td class="nr">181 orders &middot; 17.17h required</td>
+              <td><span class="gap-pill warn">Watch</span></td>
+            </tr></tbody>
+    </table>
+  </div>
+</section>
+</div>
+<div id="tab-late-orders" class="tabpanel">
+<section class="section">
+  <div class="section-head"><h2>Late Orders — Photo</h2><span class="section-sub">Photo Late Orders tab &middot; oldest due date first</span></div>
+  <div class="four-grid">
+    <div class="panel">
+      <div class="panel-header"><h3>Slides</h3><span class="dept-badge badge-photo">0 orders</span></div>
+      <div class="panel-total"><b>0</b> units late</div>
+      <div style="max-height:480px;overflow-y:auto;border:1px solid var(--line);border-radius:4px;">
+        <table class="cap" style="width:100%;">
+          <thead><tr><th>Order ID</th><th>Due Date</th><th class="nr">Qty</th><th>Storage</th></tr></thead>
+          <tbody><tr><td colspan="4" style="color:var(--good);padding:10px 14px;">No late orders &#x2713;</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><h3>Negatives</h3><span class="dept-badge badge-photo">12 orders</span></div>
+      <div class="panel-total"><b>5,505</b> units late</div>
+      <div style="max-height:480px;overflow-y:auto;border:1px solid var(--line);border-radius:4px;">
+        <table class="cap" style="width:100%;">
+          <thead><tr><th>Order ID</th><th>Due Date</th><th class="nr">Qty</th><th>Storage</th></tr></thead>
+          <tbody><tr><td>KTD26AWF2QWIK</td><td>8/5/2026</td><td class="nr">100</td><td>Rack06B</td></tr><tr><td>KTM26AUKN22P2</td><td>8/7/2026</td><td class="nr">50</td><td>negative pile</td></tr><tr><td>KTG26AWFPYJL4</td><td>8/7/2026</td><td class="nr">50</td><td>HS Room</td></tr><tr><td>W26AE43ESSK</td><td>8/7/2026</td><td class="nr">100</td><td>Rack 15A</td></tr><tr><td>KTG25AW3H41U8</td><td>8/11/2026</td><td class="nr">1,000</td><td>HS Room</td></tr><tr><td>26AWGAHEJS</td><td>8/11/2026</td><td class="nr">5</td><td>HS Room</td></tr><tr><td>KTM26ACFYBL00</td><td>8/13/2026</td><td class="nr">1,000</td><td>Rack 18D</td></tr><tr><td>KTD26AJ56H5P8</td><td>8/14/2026</td><td class="nr">800</td><td>Rack 18 A</td></tr><tr><td>KTL26AEBBVIB3</td><td>8/14/2026</td><td class="nr">400</td><td>RACK06B</td></tr><tr><td>KTL26APUC8WSR</td><td>8/17/2026</td><td class="nr">1,200</td><td>18b</td></tr><tr><td>KTG26AR27WF74</td><td>8/18/2026</td><td class="nr">300</td><td>Negatives Pile</td></tr><tr><td>26AK3M6FM7</td><td>8/18/2026</td><td class="nr">500</td><td>Rack19A</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><h3>Special</h3><span class="dept-badge badge-photo">5 orders</span></div>
+      <div class="panel-total"><b>44</b> units late</div>
+      <div style="max-height:480px;overflow-y:auto;border:1px solid var(--line);border-radius:4px;">
+        <table class="cap" style="width:100%;">
+          <thead><tr><th>Order ID</th><th>Due Date</th><th class="nr">Qty</th><th>Storage</th></tr></thead>
+          <tbody><tr><td>KT24ABYGFDOL</td><td>8/5/2026</td><td class="nr">1</td><td>Special Rack</td></tr><tr><td>KT24ABYGFDOL</td><td>8/5/2026</td><td class="nr">2</td><td>Special Rack</td></tr><tr><td>KT24ABYGFDOL</td><td>8/5/2026</td><td class="nr">1</td><td>Special Rack</td></tr><tr><td>W26AWGCC3M7</td><td>8/11/2026</td><td class="nr">30</td><td>Rack 18 A</td></tr><tr><td>KTM26ACFYBL00</td><td>8/13/2026</td><td class="nr">10</td><td>Rack 18D</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><h3>Paper</h3><span class="dept-badge badge-photo">2 orders</span></div>
+      <div class="panel-total"><b>57</b> units late</div>
+      <div style="max-height:480px;overflow-y:auto;border:1px solid var(--line);border-radius:4px;">
+        <table class="cap" style="width:100%;">
+          <thead><tr><th>Order ID</th><th>Due Date</th><th class="nr">Qty</th><th>Storage</th></tr></thead>
+          <tbody><tr><td>26ANMCW2ZB</td><td>8/6/2026</td><td class="nr">54</td><td>Rack 18D</td></tr><tr><td>H26AWG6JGRU</td><td>8/18/2026</td><td class="nr">3</td><td>Paper Pile</td></tr></tbody>
+        </table>
+      </div>
+    </div></div>
+</section>
+</div>
+<div id="tab-overview" class="tabpanel">
+<section class="section">
+  <div class="section-head"><h2>Status Overview</h2></div>
+  <div class="status-pill warn"><span class="dot warn"></span>Slides are fully caught up (0 late) and focus has shifted to Negatives — but Ops is still down 33 hrs against required coverage, and two Photo staff (Robel, Thomas) are out today without a note explaining it.</div>
+</section>
+
+<section class="section">
+  <div class="section-head"><h2>Notes From The Floor</h2><span class="section-sub">Daily Notes tab &middot; polished for clarity</span></div>
+  <div class="panel">
+    <div style="padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);line-height:1.6;">Slides late orders are fully cleared. Jessika is being reassigned off Slides to Negatives and Special for the evening.</div><div style="padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);line-height:1.6;">Focus turns to the small pile of Special and Paper lates, then shifts entirely to Negatives once those clear.</div><div style="padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);line-height:1.6;">Jess is continuing to help in Print for the first half of the shift.</div><div style="padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);line-height:1.6;">Rob is on Film for the full shift; Sophie is splitting between Film and Negatives.</div><div style="padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);line-height:1.6;">Trent is back today and will staff Shipping for the full shift.</div><div style="padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);line-height:1.6;">Anita is covering Video Review, Final Check, and Matching, with overflow time going to Shipping.</div><div style="padding:8px 0;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);line-height:1.6;">Kian is covering Reception and Kits, then Shipping for the remainder of the shift.</div>
+  </div>
+</section>
+<section class="section">
+  <div class="section-head"><h2>Suggested Moves &amp; AI Insights</h2><span class="section-sub">Generated from today's computed metrics + Daily Notes</span></div>
+  <div class="action-grid">
+    <div class="action-panel critical">
+      <div class="action-head"><div class="a-icon bad">!</div><h3>Ops still short despite Trent&#x27;s return</h3></div>
+      <div class="action-body">Trent is back and staffing Shipping full-shift, which helps — but Ops is still scheduled for only <b>25.0 of the 58.2 hrs required</b> (a 33.2-hr gap). Anita is covering Video Review/Final Check/Matching with Shipping overflow, and Kian is on Reception/Kits then Shipping.</div>
+      <div class="move-names"><span class="move-chip">Consider pulling a cross-trained Photo/Film staffer into Ops overflow</span><span class="move-chip">Shipping (139 orders, 11.58 hrs) is the single largest Ops task</span></div>
+      <div class="action-why">Even with Trent back, scheduled Ops hours cover well under half of what the sheet estimates is required today.</div>
+    </div>
+    <div class="action-panel watch">
+      <div class="action-head"><div class="a-icon warn">▲</div><h3>Two Photo staff out today, unexplained in notes</h3></div>
+      <div class="action-body">Robel Siamregne (Slides) and Thomas Townsend (Paper) are both marked absent in Staffing today, but neither is mentioned in the floor notes. Slides is now covered by just Jessika Leiss for part of her shift (3.83 hrs) against a queue of 101,542 with 21,772 due in 7 days.</div>
+      <div class="move-names"><span class="move-chip">Confirm whether Robel/Thomas call-outs were expected</span><span class="move-chip">Watch Slides coverage now that lates are cleared but staffing thinned</span></div>
+      <div class="action-why">Slides just cleared its late backlog — thin coverage today risks lates creeping back before the queue&#x27;s 7-day-due bucket (21,772) is worked down.</div>
+    </div>
+    <div class="action-panel watch">
+      <div class="action-head"><div class="a-icon warn">▲</div><h3>Negatives is now the priority per today&#x27;s notes</h3></div>
+      <div class="action-body">With Slides and (soon) Special/Paper clear, focus shifts fully to Negatives: 6,164 late, 33,679 due in 7 days — the largest near-term bucket in Photo. Five staff are on it today (Hyon, Jea, Jodi, Michal, and Jessika for part of her shift), plus Sophie splitting in from Film.</div>
+      <div class="move-names"><span class="move-chip">Keep Negatives staffing as-is — matches today&#x27;s stated focus</span></div>
+      <div class="action-why">Negatives carries the largest 7-day-due bucket of any Photo category and today&#x27;s notes confirm it&#x27;s the intended next target.</div>
+    </div>
+    <div class="action-panel info">
+      <div class="action-head"><div class="a-icon info">i</div><h3>Special station unstaffed again today</h3></div>
+      <div class="action-body">44 units are late in Special with 0 output today — the same gap as two days ago. Jea Seok, Jessica Spear, Jessika Leiss, and Sophie Worthman are all cross-trained on it.</div>
+      <div class="move-names"><span class="move-chip">A short Special pass would clear this small backlog</span></div>
+      <div class="action-why">It&#x27;s a small queue (44 late) that a brief reassignment could clear entirely, and it&#x27;s been sitting unstaffed across multiple days now.</div>
+    </div></div>
+</section>
+<section class="section">
+  <div class="trend-wrap">
+    <div class="trend-panel">
+      <div class="trend-section-label">Key Numbers — Today</div>
+      <div class="tstat"><span class="tl">Backlog today</span><span class="tv bad">407,140</span></div>
+      <div class="tstat"><span class="tl">Checked in</span><span class="tv">303,472</span></div>
+      <div class="tstat"><span class="tl">Pending WSA</span><span class="tv">35,811</span></div>
+      <div class="tstat"><span class="tl">Avg 10-day output</span><span class="tv">24,823</span></div>
+      <div class="tstat"><span class="tl">Avg 10-day inbound</span><span class="tv">16,279</span></div>
+      <div class="tstat"><span class="tl">Output surplus</span><span class="tv good">+8,544/day</span></div>
+      <div class="trend-note">Backlog sits at 407,140 today, up from 402,562 yesterday and still above the 8/13 reading of 423,932 by about 16,800 net over the week. As on prior runs, the Turn Estimate tab&#x27;s own most recent log row (382,317, dated 8/20) trails the live snapshot by about 24,800 — the log likely hasn&#x27;t refreshed yet, so the live 407,140 figure is the one to trust right now.</div>
+    </div>
+    <div class="trend-panel">
+      <div class="trend-section-label">Backlog — Recent History (Turn Estimate tab)</div>
+      <div class="tstat"><span class="tl">8/13/2026</span><span class="tv">423,932</span></div><div class="tstat"><span class="tl">8/14/2026</span><span class="tv">419,380</span></div><div class="tstat"><span class="tl">8/17/2026</span><span class="tv">401,356</span></div><div class="tstat"><span class="tl">8/18/2026</span><span class="tv">393,981</span></div><div class="tstat"><span class="tl">8/19/2026</span><span class="tv">376,330</span></div><div class="tstat"><span class="tl">8/20/2026</span><span class="tv">382,317</span></div>
+      <div class="trend-note">At the sheet&#x27;s Avg 10-Day Output (24,823/day) against Avg 10-Day Inbound (16,279/day), the shop is running a surplus of about 8,544 units/day — slightly lower than yesterday&#x27;s 8,802 but still a solid pace, assuming Ops staffing doesn&#x27;t slip further.</div>
+    </div>
+  </div>
+</section>
+</div>
+
+<footer>
+  <div>Source: Production and Operations Dashboard &middot; Google Sheets (Photo Queue, Film Queue, Video Queue, Ops, Staffing, Yesterday Scores, Week Data, Turn Estimate, Output by Station, Photo Late Orders, Daily Notes)</div>
+  <div>Generated 2026-08-20T17:27:30</div>
+</footer>
+<script>
+function showTab(id, btn){
+  document.querySelectorAll('.tabpanel').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.tabbtn').forEach(function(b){b.classList.remove('active');});
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>
