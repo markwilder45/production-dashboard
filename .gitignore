@@ -1,0 +1,6 @@
+# Intermediate per-run files -- regenerated locally each time, never published.
+# See README.md for why these stay out of the repo.
+data.json
+narrative.json
+raw/
+capacity_log_prior.json
