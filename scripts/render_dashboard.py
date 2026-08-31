@@ -264,6 +264,17 @@ table.cap tr.dept-row td{background:#0F1318;padding:5px 10px;}
 .why-tag.trend-unchanged_at_risk{background:var(--warn-dim);color:var(--warn);}
 .why-tag.trend-resolved{background:var(--good-dim);color:var(--good);}
 .why-body{font-size:12px;color:var(--muted);line-height:1.6;}
+
+.rec-pill{font-size:10px;font-weight:700;text-transform:uppercase;padding:3px 8px;border-radius:2px;font-family:'Oswald',sans-serif;letter-spacing:.05em;white-space:nowrap;}
+.rec-pill.hire{background:var(--accent-dim);color:var(--accent);}
+.rec-pill.equipment{background:var(--film-dim);color:var(--film);}
+.rec-pill.shift_rebalance{background:var(--warn-dim);color:var(--warn);}
+.rec-pill.reallocate_surplus{background:var(--good-dim);color:var(--good);}
+.rec-pill.review{background:#28303C;color:var(--muted);}
+.shift-summary{display:flex;gap:22px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:var(--muted);}
+.shift-summary b{color:var(--ink);font-family:'Oswald',sans-serif;}
+.rec-card .action-head{justify-content:space-between;}
+.rec-card .action-head .rec-title-wrap{display:flex;align-items:center;gap:9px;}
 """
 
 JS = """
@@ -790,10 +801,102 @@ def render_why_behind(d, n):
 """
 
 
+REC_TYPE_LABEL = {
+    "hire": "Hire", "equipment": "Add Equipment", "shift_rebalance": "Rebalance Shifts",
+    "reallocate_surplus": "Reallocate Surplus", "review": "Review Needed",
+}
+REC_TYPE_ICON = {
+    "hire": ("+", "bad"), "equipment": ("E", "bad"), "shift_rebalance": ("↔", "warn"),
+    "reallocate_surplus": ("↓", "info"), "review": ("?", "warn"),
+}
+REC_TYPE_PANEL_CLASS = {
+    "hire": "critical", "equipment": "critical", "shift_rebalance": "watch",
+    "reallocate_surplus": "info", "review": "watch",
+}
+SHIFT_WINDOW_LABEL = {"1st": "1st shift (6:30am-3pm)", "2nd": "2nd shift (3pm-11pm)"}
+
+
+def render_recommendations_panel(d):
+    sr = d.get("shift_recommendations")
+    if not sr:
+        return ""
+    summary = sr.get("shop_summary", {})
+    summary_line = f"""
+    <div class="shift-summary">
+      <span>1st shift ({SHIFT_WINDOWS_1ST}) production headcount today: <b>{fnum(summary.get('1st',{}).get('headcount'))}</b></span>
+      <span>2nd shift ({SHIFT_WINDOWS_2ND}) production headcount today: <b>{fnum(summary.get('2nd',{}).get('headcount'))}</b></span>
+      <span>Physical stations shop-wide: <b>{fnum(summary.get('1st',{}).get('stations_available_shopwide'))}</b></span>
+    </div>"""
+
+    cards = ""
+    for g in sr.get("by_group", []):
+        rec = g["recommendation"]
+        if rec["type"] == "ok" or not rec.get("reasoning"):
+            continue
+        rtype = rec["type"]
+        icon, iconclass = REC_TYPE_ICON.get(rtype, ("i", "info"))
+        panelclass = REC_TYPE_PANEL_CLASS.get(rtype, "info")
+        pill_label = REC_TYPE_LABEL.get(rtype, rtype)
+        if rec.get("shift"):
+            pill_label += f" — {rec['shift']} shift"
+        cards += f"""
+    <div class="action-panel rec-card {panelclass}">
+      <div class="action-head">
+        <div class="rec-title-wrap"><div class="a-icon {iconclass}">{icon}</div><h3>{esc(g['name'])}</h3></div>
+        <span class="rec-pill {rtype}">{esc(pill_label)}</span>
+      </div>
+      <div class="action-body">{esc(rec['reasoning'])}</div>
+    </div>"""
+
+    ops = sr.get("ops", {})
+    ops_note = ops.get("note")
+    if ops_note:
+        cards += f"""
+    <div class="action-panel rec-card watch">
+      <div class="action-head">
+        <div class="rec-title-wrap"><div class="a-icon warn">?</div><h3>Operations</h3></div>
+        <span class="rec-pill shift_rebalance">Shift Coverage</span>
+      </div>
+      <div class="action-body">{esc(ops_note)}</div>
+    </div>"""
+
+    if not cards:
+        return f"""
+<section class="section">
+  <div class="section-head"><h2>Recommendations</h2>
+  <span class="section-sub">Hire vs. equipment vs. rebalance, sized from today's shift headcount against physical station counts</span></div>
+  {summary_line}
+  <div class="panel" style="padding:14px 16px;font-size:12.5px;color:var(--muted);">No hiring, equipment, or shift-rebalance calls today — every at-risk station's headcount already matches its available equipment.</div>
+</section>"""
+
+    return f"""
+<section class="section">
+  <div class="section-head"><h2>Recommendations</h2>
+  <span class="section-sub">Hire vs. equipment vs. rebalance, sized from today's shift headcount against physical station counts</span></div>
+  {summary_line}
+  <div style="font-size:11.5px;color:var(--muted-dim);margin-bottom:14px;">
+    Sizing logic: every physical station needs one dedicated operator each shift to hit its full daily equipment
+    capacity (Station Capacity tab). When a station has idle equipment on a shift (more physical units than assigned
+    operator-equivalents) and it's at risk of falling behind, that's a <b>hire</b> or shift-move call. When every
+    available unit already has an operator on both shifts and it's still behind, more staff wouldn't help — that's
+    an <b>equipment</b> call. When one shift is short while the other has spare coverage for the same station,
+    that's a <b>rebalance</b>, not a net-new hire. Stations with more than a handful of small units (e.g. Video's
+    tape decks) are batch-tended, not 1-to-1 — those fall back to the equipment/staffing utilization signal instead
+    of a literal per-unit headcount.
+  </div>
+  <div class="action-grid">{cards}</div>
+</section>"""
+
+
+SHIFT_WINDOWS_1ST = "6:30am-3pm"
+SHIFT_WINDOWS_2ND = "3pm-11pm"
+
+
 def render_capacity_forecast_tab(d, n):
     groups = d.get("capacity_forecast", [])
     by_name = {g["name"]: g for g in groups}
     why_html = render_why_behind(d, n)
+    rec_html = render_recommendations_panel(d)
     dept_html = ""
     for dept in FORECAST_DEPT_ORDER:
         names = [name for name, dp in FORECAST_GROUP_DEPT.items() if dp == dept]
@@ -850,6 +953,7 @@ def render_capacity_forecast_tab(d, n):
     its own backlog or ready to help elsewhere.
   </div>
   {why_html}
+  {rec_html}
   {dept_html}
 </section>
 """

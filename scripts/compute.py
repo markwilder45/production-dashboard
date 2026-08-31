@@ -39,6 +39,26 @@ WEEKDAY_COL = {
     # staffing section will just show 0 unless overridden.
 }
 
+# Mark's floor runs two working shifts: 1st = 6:30am-3pm, 2nd = 3pm-11pm.
+# The Staffing tab's "Shift" column sometimes carries other raw values --
+# "3rd" (a true 10pm-6:30am shift exists but is effectively unstaffed today
+# except for one technician who is the sole person at their station and
+# reassigns after 11pm) and "- Part Time" suffixes. Per Mark: for shift-
+# capacity counting purposes, fold "3rd" into "2nd". Anything else
+# unrecognized maps to None (excluded from shift-capacity math rather than
+# guessed at) so a labeling surprise shows up as a gap, not a silent miscount.
+SHIFT_WINDOWS = {"1st": "6:30am-3pm", "2nd": "3pm-11pm"}
+
+
+def normalize_shift(raw):
+    s = (raw or "").strip().lower()
+    s = s.split(" - ")[0].strip()  # drop "- Part Time" / "- part time" etc.
+    if s == "1st":
+        return "1st"
+    if s in ("2nd", "3rd"):
+        return "2nd"
+    return None
+
 
 def read_csv(path):
     with open(path, "r", encoding="utf-8", newline="") as f:
@@ -251,6 +271,7 @@ def parse_staffing(rows, weekday_idx):
         if day_col_name and day_col_name in col:
             scheduled_today = g(day_col_name).strip().upper() == "TRUE"
         trained_on = [tc.replace("Trained on ", "").strip() for tc in trained_cols if g(tc).strip().upper() == "TRUE"]
+        shift_raw = g("Shift")
         person = {
             "name": g("Staff Name"),
             "station": g("Station"),
@@ -262,6 +283,8 @@ def parse_staffing(rows, weekday_idx):
             "hrly_throughput": to_num(g("Hrly ThruPut"), None),
             "expected_output": to_num(g("Expected Output"), None),
             "trained_on": trained_on,
+            "shift_raw": shift_raw,
+            "shift": normalize_shift(shift_raw),
         }
         people.append(person)
 
@@ -974,6 +997,289 @@ def merge_capacity_trend(groups, prior_log, report_date=None):
     return groups
 
 
+# ---------------------------------------------------------------- Shift-Capacity Recommendations
+#
+# Mark's floor runs two shifts (1st: 6:30am-3pm, 2nd: 3pm-11pm). Every
+# equipment row in the Station Capacity tab has Max Operators Per Station=1,
+# so one physical station needs exactly one operator to run, and needs a
+# DIFFERENT operator on each shift to use its full "Operating Hours per Day
+# Available" window (~16hrs = both shifts combined). That gives a clean,
+# mechanical way to tell "hire a person" apart from "buy a machine" apart
+# from "move someone's shift": compare, per station group and per shift,
+# how many people are actually assigned against how many physical stations
+# are available (not down for repair).
+#
+#   assigned < available on a shift  -> idle equipment that shift -- hiring
+#                                        (or moving someone onto that shift)
+#                                        would actually get used.
+#   assigned >= available on BOTH shifts, but still behind -> equipment is
+#                                        the ceiling -- more people wouldn't
+#                                        help, more machines would.
+#   understaffed one shift, oversupplied the other (same group) -> a shift
+#                                        rebalance, not a net new hire.
+#
+# This is pure headcount-vs-machine-count arithmetic -- no judgment -- so
+# render_dashboard.py can print the reasoning directly without needing
+# narrative.json to write it fresh each day.
+
+SHIFTS = ["1st", "2nd"]
+
+# Reference full-shift hours, used to turn a person's actual hours at a
+# station into an operator-equivalent (FTE) figure rather than a plain head-
+# count. This matters because several people (Rob Hall, Jessika Leiss) have
+# TWO separate Staffing-tab rows for two different stations with half a
+# normal shift's hours on each (e.g. 3.83 = half of 7.67) -- the sheet is
+# modeling them as splitting one shift across two stations, not doubling up.
+# Counting them as a full "1" at each station would hide exactly the kind of
+# spread-too-thin gap Mark is asking this feature to catch. 7.67 is the
+# observed standard full-shift value across the roster's full-time staff.
+FULL_SHIFT_HOURS = 7.67
+
+# Above this many available "stations" for a group, a literal 1-operator-
+# per-unit hiring count stops being sane advice. Video's 23 available units
+# are individual tape decks/players -- a batch-tended setup where one
+# technician loads and monitors several at once, not 23 people each hand-
+# tending a single deck all day (unlike a Photo/Film wet-process station,
+# which genuinely does need continuous 1:1 attention). Rather than hardcode
+# "Video" by name, key off the station count itself so this stays correct
+# if the equipment sheet changes shape later.
+MAX_SANE_STATIONS_FOR_LITERAL_HIRE = 6
+
+
+def _assigned_by_shift(people, station_name):
+    """People assigned to a station today, split by normalized shift, as
+    both a display name list and an operator-equivalent (FTE) figure based
+    on actual hours logged at that specific station (not a raw headcount --
+    see FULL_SHIFT_HOURS above). A person with an unrecognized/blank shift
+    value is counted in an 'unmapped' bucket rather than silently dropped or
+    guessed into a shift -- that's a data-quality gap worth surfacing."""
+    names = {"1st": [], "2nd": [], "unmapped": []}
+    fte = {"1st": 0.0, "2nd": 0.0, "unmapped": 0.0}
+    for p in people:
+        if p["station"] != station_name or not p["scheduled_today"] or p["absent"]:
+            continue
+        bucket = p["shift"] if p["shift"] in SHIFTS else "unmapped"
+        hrs = p["hours"] if p["hours"] is not None else FULL_SHIFT_HOURS
+        names[bucket].append(p["name"] if hrs >= FULL_SHIFT_HOURS - 0.05 else f"{p['name']} (partial, {fnum_py(hrs,1)}h)")
+        fte[bucket] += min(hrs, FULL_SHIFT_HOURS) / FULL_SHIFT_HOURS
+    return {
+        "1st": {"names": names["1st"], "fte": round(fte["1st"], 2)},
+        "2nd": {"names": names["2nd"], "fte": round(fte["2nd"], 2)},
+        "unmapped": {"names": names["unmapped"], "fte": round(fte["unmapped"], 2)},
+    }
+
+
+def build_shift_recommendations(data):
+    people = data["staffing"]["people"]
+    groups = data["capacity_forecast"]
+
+    shop_headcount = {"1st": set(), "2nd": set(), "unmapped": set()}
+    shop_stations_available = 0
+
+    by_group = []
+    for g in groups:
+        station_name = g["name"]
+        available = max((g.get("equipment_stations_total") or 0) - (g.get("equipment_stations_down") or 0), 0)
+        shop_stations_available += available
+        assigned = _assigned_by_shift(people, station_name)
+        for shift in SHIFTS:
+            shop_headcount[shift].update(assigned[shift]["names"])
+        shop_headcount["unmapped"].update(assigned["unmapped"]["names"])
+
+        shifts_info = {}
+        for shift in SHIFTS:
+            fte = assigned[shift]["fte"]
+            shifts_info[shift] = {
+                "assigned_count": fte,  # operator-equivalent (FTE), not a raw headcount -- see FULL_SHIFT_HOURS
+                "assigned_names": assigned[shift]["names"],
+                "stations_available": available,
+                "gap": round(available - fte, 2),  # positive = idle equipment this shift
+            }
+
+        # is this group actually a live problem worth recommending anything for?
+        late_weeks = [w for w in g["weeks"] if w["status"] == "at_risk_late"]
+        low_weeks = [w for w in g["weeks"] if w["status"] == "at_risk_running_low"]
+
+        rec = {"type": "ok", "shift": None, "reasoning": None}
+        if not late_weeks and low_weeks:
+            first = low_weeks[0]["week"]
+            rec = {
+                "type": "reallocate_surplus", "shift": None,
+                "reasoning": (
+                    f"{station_name} is projected to clear its entire current queue with a full week or more "
+                    f"of spare capacity by Week {first} at today's staffed rate ({fnum_py(g['staffed_daily_capacity'])}/day "
+                    f"vs. a {fnum_py(g['total_queue'])}-unit queue). Before adding headcount or equipment anywhere else, "
+                    f"consider reallocating some of {station_name}'s staffed time toward a behind station."
+                ),
+            }
+        elif late_weeks and available > MAX_SANE_STATIONS_FOR_LITERAL_HIRE:
+            # Batch-tended equipment (see MAX_SANE_STATIONS_FOR_LITERAL_HIRE) --
+            # the per-unit headcount model above doesn't apply, so fall back to
+            # the same equipment/staffing signal the forecast already computes
+            # rather than assert a literal (and likely absurd) hire count.
+            first = late_weeks[0]["week"]
+            cb = g.get("constrained_by")
+            if cb == "staffing":
+                util = g.get("utilization_vs_equipment_pct")
+                rec = {
+                    "type": "hire", "shift": None,
+                    "reasoning": (
+                        f"{station_name} has {fnum_py(available)} available units -- too many for a literal "
+                        f"1-operator-per-unit hiring count (this looks like batch-tended equipment, e.g. one "
+                        f"technician running several decks/players at once). At {fnum_py(util,0)}% "
+                        f"of equipment capacity used, staffing -- not equipment -- is the constraint; at risk of "
+                        f"falling behind starting Week {first}. Consider adding an operator (either shift) rather than more units."
+                    ),
+                }
+            elif cb == "equipment":
+                rec = {
+                    "type": "equipment", "shift": None,
+                    "reasoning": (
+                        f"{station_name} is running at {fnum_py(g.get('utilization_vs_equipment_pct'),0)}% of its equipment "
+                        f"ceiling with {fnum_py(g.get('equipment_stations_down'))} of {fnum_py(available)} units down -- "
+                        f"repairing/replacing down units is the likelier lever here, not headcount, and it's at risk "
+                        f"of falling behind starting Week {first}."
+                    ),
+                }
+            else:
+                rec = {
+                    "type": "review", "shift": None,
+                    "reasoning": (
+                        f"{station_name} is at risk of falling behind starting Week {first}, but with "
+                        f"{fnum_py(available)} available units this needs a manual look rather than an automatic "
+                        f"hire/equipment call -- neither staffing nor equipment shows a clear-cut signal."
+                    ),
+                }
+        elif late_weeks:
+            first = late_weeks[0]["week"]
+            gap_1st, gap_2nd = shifts_info["1st"]["gap"], shifts_info["2nd"]["gap"]
+            avail_s = fnum_py(available)
+            a1, a2 = fte_str(shifts_info["1st"]["assigned_count"]), fte_str(shifts_info["2nd"]["assigned_count"])
+            if gap_1st > 0 and gap_2nd <= 0:
+                rec = {
+                    "type": "hire", "shift": "1st",
+                    "reasoning": (
+                        f"{station_name} has {avail_s} physical station(s) available but only "
+                        f"{a1} operator-equivalent(s) assigned on 1st shift ({SHIFT_WINDOWS['1st']}) "
+                        f"today -- {fte_str(gap_1st)} station(s) sitting idle that shift while it's at risk of falling behind "
+                        f"starting Week {first}. Hiring or moving someone onto 1st shift here would use equipment "
+                        f"that's already paid for."
+                    ),
+                }
+            elif gap_2nd > 0 and gap_1st <= 0:
+                rec = {
+                    "type": "hire", "shift": "2nd",
+                    "reasoning": (
+                        f"{station_name} has {avail_s} physical station(s) available but only "
+                        f"{a2} operator-equivalent(s) assigned on 2nd shift ({SHIFT_WINDOWS['2nd']}) "
+                        f"today -- {fte_str(gap_2nd)} station(s) sitting idle that shift while it's at risk of falling behind "
+                        f"starting Week {first}. Hiring or moving someone onto 2nd shift here would use equipment "
+                        f"that's already paid for."
+                    ),
+                }
+            elif gap_1st > 0 and gap_2nd > 0:
+                bigger_shift = "1st" if gap_1st >= gap_2nd else "2nd"
+                rec = {
+                    "type": "hire", "shift": bigger_shift,
+                    "reasoning": (
+                        f"{station_name} has {avail_s} physical station(s) available but is short operators on "
+                        f"BOTH shifts today (1st: {a1} of {avail_s}, "
+                        f"2nd: {a2} of {avail_s}) -- and is at risk of falling "
+                        f"behind starting Week {first}. {bigger_shift} shift has the bigger gap "
+                        f"({fte_str(max(gap_1st,gap_2nd))} idle station(s)) and is the higher-priority hire."
+                    ),
+                }
+            elif gap_1st < 0 and gap_2nd > 0:
+                rec = {
+                    "type": "shift_rebalance", "shift": "2nd",
+                    "reasoning": (
+                        f"{station_name} has more operator-equivalents assigned on 1st shift ({a1}) "
+                        f"than it has stations ({avail_s}), while 2nd shift is short ({a2} "
+                        f"of {avail_s}) -- and it's at risk of falling behind starting Week {first}. This reads as a "
+                        f"scheduling mismatch, not a headcount shortfall: moving one person from 1st to 2nd here likely "
+                        f"closes the gap without a new hire."
+                    ),
+                }
+            elif gap_2nd < 0 and gap_1st > 0:
+                rec = {
+                    "type": "shift_rebalance", "shift": "1st",
+                    "reasoning": (
+                        f"{station_name} has more operator-equivalents assigned on 2nd shift ({a2}) "
+                        f"than it has stations ({avail_s}), while 1st shift is short ({a1} "
+                        f"of {avail_s}) -- and it's at risk of falling behind starting Week {first}. This reads as a "
+                        f"scheduling mismatch, not a headcount shortfall: moving one person from 2nd to 1st here likely "
+                        f"closes the gap without a new hire."
+                    ),
+                }
+            else:
+                # Every available station already has an operator on both shifts (gap <= 0 both),
+                # yet the station is still projected behind -- staffing is maxed relative to the
+                # equipment that exists, so more people wouldn't help. More machines would.
+                rec = {
+                    "type": "equipment", "shift": None,
+                    "reasoning": (
+                        f"{station_name} already has an operator-equivalent on every available station, on both shifts "
+                        f"(1st: {a1}/{avail_s}, 2nd: {a2}/{avail_s}) "
+                        f"-- yet it's at risk of falling behind starting Week {first}. There's no idle equipment "
+                        f"to staff up onto, so a new hire here would have nowhere to work. This is an equipment "
+                        f"ceiling: adding another {station_name} station/machine (net of the "
+                        f"{fnum_py(g.get('equipment_stations_down'))} currently down, if any are repairable) is the "
+                        f"lever that would actually help."
+                    ),
+                }
+
+        by_group.append({
+            "name": station_name,
+            "equipment_stations_available": available,
+            "shifts": shifts_info,
+            "recommendation": rec,
+        })
+
+    ops_people = [p for p in people if p["department"] == "Operations" and p["scheduled_today"] and not p["absent"]]
+    ops_by_shift = {"1st": set(), "2nd": set(), "unmapped": set()}
+    for p in ops_people:
+        ops_by_shift[p["shift"] if p["shift"] in SHIFTS else "unmapped"].add(p["name"])
+    ops_note = None
+    if len(ops_by_shift["1st"]) == 0 and len(ops_by_shift["2nd"]) > 0:
+        ops_note = (
+            f"All {len(ops_by_shift['2nd'])} present Ops staff today are on 2nd shift ({SHIFT_WINDOWS['2nd']}); "
+            f"none are on 1st shift ({SHIFT_WINDOWS['1st']}). Reception, Check-In, and same-day Tickets work has "
+            f"no dedicated Ops coverage during the morning window under today's schedule -- worth confirming "
+            f"whether that's the normal pattern or a gap."
+        )
+
+    return {
+        "shop_summary": {
+            shift: {"headcount": len(shop_headcount[shift]), "stations_available_shopwide": shop_stations_available}
+            for shift in SHIFTS
+        },
+        "shop_unmapped_shift_people": sorted(shop_headcount["unmapped"]),
+        "by_group": by_group,
+        "ops": {
+            "headcount_1st": len(ops_by_shift["1st"]), "headcount_2nd": len(ops_by_shift["2nd"]),
+            "note": ops_note,
+        },
+    }
+
+
+def fnum_py(v, decimals=0):
+    """Tiny local formatter (compute.py has no render helpers) -- just
+    enough for readable numbers inside mechanically-generated reasoning
+    strings above. decimals=1 is used for FTE/operator-equivalent figures
+    so a partial (e.g. 0.5) assignment doesn't get rounded away to 0 or 1."""
+    if v is None:
+        return "—"
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return str(v)
+    return f"{v:,.{decimals}f}"
+
+
+def fte_str(v):
+    return fnum_py(v, 1)
+
+
 # ---------------------------------------------------------------- Daily Notes
 
 def parse_daily_notes(rows):
@@ -1058,6 +1364,7 @@ def main():
 
     data["station_capacity"] = build_station_capacity(data)
     data["capacity_forecast"] = merge_capacity_trend(build_capacity_forecast(data), capacity_log_prior, report_date=data["meta"]["date"])
+    data["shift_recommendations"] = build_shift_recommendations(data)
 
     # ---- derived top-line KPIs (all mechanical, no judgment) ----
     te_cur = data["turn_estimate"]["current"] or {}
