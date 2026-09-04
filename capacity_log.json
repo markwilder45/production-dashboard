@@ -498,5 +498,130 @@
         ]
       }
     ]
+  },
+  {
+    "date": "2026-09-04",
+    "groups": [
+      {
+        "name": "Negatives",
+        "total_queue": 115964.0,
+        "late": 5149.0,
+        "staffed_daily_capacity": 9307.0,
+        "equipment_daily_capacity": 11680.0,
+        "utilization_vs_equipment_pct": 79.7,
+        "constrained_by": null,
+        "week_statuses": [
+          "on_track",
+          "on_track",
+          "on_track",
+          "at_risk_running_low"
+        ]
+      },
+      {
+        "name": "Slides",
+        "total_queue": 120414.0,
+        "late": 7823.0,
+        "staffed_daily_capacity": 4213.0,
+        "equipment_daily_capacity": 6080.0,
+        "utilization_vs_equipment_pct": 69.3,
+        "constrained_by": "mixed",
+        "week_statuses": [
+          "at_risk_late",
+          "at_risk_late",
+          "at_risk_late",
+          "at_risk_late"
+        ]
+      },
+      {
+        "name": "Paper",
+        "total_queue": 87466.0,
+        "late": 18.0,
+        "staffed_daily_capacity": 10644.0,
+        "equipment_daily_capacity": 25600.0,
+        "utilization_vs_equipment_pct": 41.6,
+        "constrained_by": null,
+        "week_statuses": [
+          "on_track",
+          "on_track",
+          "at_risk_running_low",
+          "at_risk_running_low"
+        ]
+      },
+      {
+        "name": "Special",
+        "total_queue": 4579.0,
+        "late": 688.0,
+        "staffed_daily_capacity": 1819.0,
+        "equipment_daily_capacity": 1920.0,
+        "utilization_vs_equipment_pct": 94.7,
+        "constrained_by": null,
+        "week_statuses": [
+          "on_track",
+          "at_risk_running_low",
+          "at_risk_running_low",
+          "at_risk_running_low"
+        ]
+      },
+      {
+        "name": "Film Splice",
+        "total_queue": 126812.0,
+        "late": 0,
+        "staffed_daily_capacity": 5458.0,
+        "equipment_daily_capacity": 24000.0,
+        "utilization_vs_equipment_pct": 22.7,
+        "constrained_by": "staffing",
+        "week_statuses": [
+          "at_risk_late",
+          "at_risk_late",
+          "at_risk_late",
+          "at_risk_late"
+        ]
+      },
+      {
+        "name": "Film Capture",
+        "total_queue": 126812.0,
+        "late": 0,
+        "staffed_daily_capacity": 6549.0,
+        "equipment_daily_capacity": 28800.0,
+        "utilization_vs_equipment_pct": 22.7,
+        "constrained_by": "staffing",
+        "week_statuses": [
+          "at_risk_late",
+          "at_risk_late",
+          "at_risk_late",
+          "on_track"
+        ]
+      },
+      {
+        "name": "Film Edit",
+        "total_queue": 126812.0,
+        "late": 0,
+        "staffed_daily_capacity": 5458.0,
+        "equipment_daily_capacity": 24000.0,
+        "utilization_vs_equipment_pct": 22.7,
+        "constrained_by": "staffing",
+        "week_statuses": [
+          "at_risk_late",
+          "at_risk_late",
+          "at_risk_late",
+          "at_risk_late"
+        ]
+      },
+      {
+        "name": "Video",
+        "total_queue": 0,
+        "late": 0,
+        "staffed_daily_capacity": 59.0,
+        "equipment_daily_capacity": 230.0,
+        "utilization_vs_equipment_pct": 25.7,
+        "constrained_by": null,
+        "week_statuses": [
+          "on_track",
+          "on_track",
+          "on_track",
+          "on_track"
+        ]
+      }
+    ]
   }
 ]
