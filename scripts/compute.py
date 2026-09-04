@@ -1069,6 +1069,26 @@ def _assigned_by_shift(people, station_name):
     }
 
 
+def classify_group_severity(rec_type, weeks):
+    """Single mechanical severity for the combined Behind & Recommended
+    Actions cards on the Capacity & Forecast tab -- derived purely from the
+    recommendation type plus how soon the forecast goes at-risk, so the
+    severity badge always agrees with the text next to it instead of a
+    separately-judged narrative severity potentially disagreeing with the
+    mechanical call. hire/equipment/shift_rebalance/review only ever get
+    generated when at least one week is already at_risk_late (see the
+    late_weeks branches above), so this just checks how soon.
+    """
+    if rec_type in ("hire", "equipment"):
+        week1 = weeks[0]["status"] if weeks else None
+        return "critical" if week1 == "at_risk_late" else "watch"
+    if rec_type in ("shift_rebalance", "review"):
+        return "watch"
+    if rec_type == "reallocate_surplus":
+        return "info"
+    return None  # "ok" -- healthy, no card needed
+
+
 def build_shift_recommendations(data):
     people = data["staffing"]["people"]
     groups = data["capacity_forecast"]
@@ -1233,6 +1253,7 @@ def build_shift_recommendations(data):
             "equipment_stations_available": available,
             "shifts": shifts_info,
             "recommendation": rec,
+            "severity": classify_group_severity(rec["type"], g["weeks"]),
         })
 
     ops_people = [p for p in people if p["department"] == "Operations" and p["scheduled_today"] and not p["absent"]]
@@ -1258,6 +1279,7 @@ def build_shift_recommendations(data):
         "ops": {
             "headcount_1st": len(ops_by_shift["1st"]), "headcount_2nd": len(ops_by_shift["2nd"]),
             "note": ops_note,
+            "severity": "watch" if ops_note else None,
         },
     }
 

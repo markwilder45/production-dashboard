@@ -564,21 +564,6 @@ def render_overview_tab(d, n):
     banner = n.get("status_banner", "")
     severity = n.get("status_severity", "warn")
 
-    moves_html = ""
-    for m in n.get("suggested_moves", []):
-        sev = m.get("severity", "info")
-        icon = "!" if sev == "critical" else ("▲" if sev == "watch" else "i")
-        iconclass = "bad" if sev == "critical" else ("warn" if sev == "watch" else "info")
-        panelclass = "critical" if sev == "critical" else ("watch" if sev == "watch" else "info")
-        chips = "".join(f'<span class="move-chip">{esc(c)}</span>' for c in m.get("chips", []))
-        moves_html += f"""
-    <div class="action-panel {panelclass}">
-      <div class="action-head"><div class="a-icon {iconclass}">{icon}</div><h3>{esc(m.get('title',''))}</h3></div>
-      <div class="action-body">{m.get('body_html', esc(m.get('body','')))}</div>
-      {f'<div class="move-names">{chips}</div>' if chips else ''}
-      {f'<div class="action-why">{esc(m.get("why",""))}</div>' if m.get('why') else ''}
-    </div>"""
-
     te = d["turn_estimate"]["history"]
     hist_rows = ""
     for e in te[:8]:
@@ -601,10 +586,6 @@ def render_overview_tab(d, n):
   <div class="status-pill {severity}"><span class="dot {severity}"></span>{esc(banner)}</div>
 </section>
 {notes_html}
-<section class="section">
-  <div class="section-head"><h2>Suggested Moves &amp; AI Insights</h2><span class="section-sub">Generated from today's computed metrics + Daily Notes</span></div>
-  <div class="action-grid">{moves_html}</div>
-</section>
 <section class="section">
   <div class="trend-wrap">
     <div class="trend-panel">
@@ -765,61 +746,32 @@ def _why_fallback_body(g):
     return " ".join(parts) or "No specific cause identified from today's numbers."
 
 
-def render_why_behind(d, n):
-    groups = d.get("capacity_forecast", [])
-    explanations = {e.get("group"): e for e in n.get("capacity_explanations", [])}
-    flagged = [g for g in groups if g["causes"] or g.get("week1_status_trend") in ("newly_emerged", "unchanged_at_risk")]
-    if not flagged:
-        return ""
-    cards = ""
-    for g in flagged:
-        primary_cause = g["causes"][0] if g["causes"] else None
-        card_class = f"cause-{primary_cause}" if primary_cause else ""
-        tags = "".join(f'<span class="why-tag cause-{c}">{esc(CAUSE_LABEL.get(c, c))}</span>' for c in g["causes"])
-        lt = g.get("late_trend")
-        if lt in LATE_TREND_LABEL:
-            tags += f'<span class="why-tag trend-{lt}">{esc(LATE_TREND_LABEL[lt])}</span>'
-        wt = g.get("week1_status_trend")
-        if wt in WEEK1_TREND_LABEL:
-            tags += f'<span class="why-tag trend-{wt}">{esc(WEEK1_TREND_LABEL[wt])}</span>'
-        exp = explanations.get(g["name"])
-        body = exp.get("body_html") if exp else None
-        if not body:
-            body = _why_fallback_body(g)
-        headline = (exp.get("headline") if exp else None) or g["name"]
-        cards += f"""
-        <div class="why-card {card_class}">
-          <div class="why-head"><h4>{esc(headline)}</h4><div class="why-tags">{tags}</div></div>
-          <div class="why-body">{body if exp and exp.get('body_html') else esc(body)}</div>
-        </div>"""
-    return f"""
-<section class="section">
-  <div class="section-head"><h2>Why We're Behind (or Suddenly Not)</h2>
-  <span class="section-sub">Performance vs. staffing vs. backlog volume, plus carry-over vs. newly-emerged status</span></div>
-  <div class="why-wrap">{cards}</div>
-</section>
-"""
-
-
 REC_TYPE_LABEL = {
     "hire": "Hire", "equipment": "Add Equipment", "shift_rebalance": "Rebalance Shifts",
     "reallocate_surplus": "Reallocate Surplus", "review": "Review Needed",
 }
 REC_TYPE_ICON = {
-    "hire": ("+", "bad"), "equipment": ("E", "bad"), "shift_rebalance": ("↔", "warn"),
-    "reallocate_surplus": ("↓", "info"), "review": ("?", "warn"),
+    "hire": "+", "equipment": "E", "shift_rebalance": "↔",
+    "reallocate_surplus": "↓", "review": "?",
 }
-REC_TYPE_PANEL_CLASS = {
-    "hire": "critical", "equipment": "critical", "shift_rebalance": "watch",
-    "reallocate_surplus": "info", "review": "watch",
-}
-SHIFT_WINDOW_LABEL = {"1st": "1st shift (6:30am-3pm)", "2nd": "2nd shift (3pm-11pm)"}
+SEVERITY_ICONCLASS = {"critical": "bad", "watch": "warn", "info": "info"}
+SEVERITY_LABEL = {"critical": "Critical", "watch": "Watch"}
 
 
-def render_recommendations_panel(d):
+def render_capacity_actions(d, n):
+    """Combined 'Why We're Behind' + 'Recommendations' — one card per
+    station that needs a decision, why + what to do together, mechanical
+    severity so the badge always matches the text. Replaces what used to
+    be two separate sections here plus a third (Suggested Moves) on the
+    Overview tab -- those three were largely repeating the same handful of
+    facts about the same handful of stations."""
+    groups = d.get("capacity_forecast", [])
+    by_name = {g["name"]: g for g in groups}
+    explanations = {e.get("group"): e for e in n.get("capacity_explanations", [])}
     sr = d.get("shift_recommendations")
     if not sr:
         return ""
+
     summary = sr.get("shop_summary", {})
     summary_line = f"""
     <div class="shift-summary">
@@ -828,63 +780,93 @@ def render_recommendations_panel(d):
       <span>Physical stations shop-wide: <b>{fnum(summary.get('1st',{}).get('stations_available_shopwide'))}</b></span>
     </div>"""
 
-    cards = ""
-    for g in sr.get("by_group", []):
-        rec = g["recommendation"]
-        if rec["type"] == "ok" or not rec.get("reasoning"):
+    critical_cards, watch_cards, surplus_rows = [], [], []
+    for entry in sr.get("by_group", []):
+        rec = entry["recommendation"]
+        severity = entry.get("severity")
+        name = entry["name"]
+        g = by_name.get(name, {})
+        if severity == "info":  # reallocate_surplus -- one line, not a full card
+            surplus_rows.append(
+                f'<div style="font-size:12.5px;color:var(--muted);padding:5px 0;border-bottom:1px solid var(--line);">'
+                f'<b style="color:var(--ink);">{esc(name)}</b> — staffed {fnum(g.get("staffed_daily_capacity"))}/day vs. '
+                f'{fnum(g.get("total_queue"))} queued, comfortably ahead. Room to lend time elsewhere.</div>'
+            )
             continue
+        if severity not in ("critical", "watch"):
+            continue  # "ok" -- healthy, nothing to show
         rtype = rec["type"]
-        icon, iconclass = REC_TYPE_ICON.get(rtype, ("i", "info"))
-        panelclass = REC_TYPE_PANEL_CLASS.get(rtype, "info")
+        icon = REC_TYPE_ICON.get(rtype, "i")
+        iconclass = SEVERITY_ICONCLASS.get(severity, "info")
         pill_label = REC_TYPE_LABEL.get(rtype, rtype)
         if rec.get("shift"):
             pill_label += f" — {rec['shift']} shift"
-        cards += f"""
-    <div class="action-panel rec-card {panelclass}">
+        tags = "".join(f'<span class="why-tag cause-{c}">{esc(CAUSE_LABEL.get(c, c))}</span>' for c in g.get("causes", []))
+        lt = g.get("late_trend")
+        if lt in LATE_TREND_LABEL:
+            tags += f'<span class="why-tag trend-{lt}">{esc(LATE_TREND_LABEL[lt])}</span>'
+        wt = g.get("week1_status_trend")
+        if wt in WEEK1_TREND_LABEL:
+            tags += f'<span class="why-tag trend-{wt}">{esc(WEEK1_TREND_LABEL[wt])}</span>'
+        exp = explanations.get(name)
+        why_body = exp.get("body_html") if exp and exp.get("body_html") else esc(_why_fallback_body(g)) if g else ""
+        card = f"""
+    <div class="action-panel rec-card {severity}">
       <div class="action-head">
-        <div class="rec-title-wrap"><div class="a-icon {iconclass}">{icon}</div><h3>{esc(g['name'])}</h3></div>
+        <div class="rec-title-wrap"><div class="a-icon {iconclass}">{icon}</div><h3>{esc(name)}</h3></div>
         <span class="rec-pill {rtype}">{esc(pill_label)}</span>
       </div>
-      <div class="action-body">{esc(rec['reasoning'])}</div>
+      <div class="why-tags" style="margin:2px 0 10px;">{tags}</div>
+      <div class="action-body"><b>Why:</b> {why_body}</div>
+      <div class="action-body" style="margin-top:8px;"><b>Do:</b> {esc(rec['reasoning'])}</div>
     </div>"""
+        (critical_cards if severity == "critical" else watch_cards).append(card)
 
     ops = sr.get("ops", {})
-    ops_note = ops.get("note")
-    if ops_note:
-        cards += f"""
+    if ops.get("note"):
+        ops_card = f"""
     <div class="action-panel rec-card watch">
       <div class="action-head">
         <div class="rec-title-wrap"><div class="a-icon warn">?</div><h3>Operations</h3></div>
         <span class="rec-pill shift_rebalance">Shift Coverage</span>
       </div>
-      <div class="action-body">{esc(ops_note)}</div>
+      <div class="action-body">{esc(ops['note'])}</div>
     </div>"""
+        watch_cards.append(ops_card)
 
-    if not cards:
+    cards = "".join(critical_cards) + "".join(watch_cards)
+    surplus_html = ""
+    if surplus_rows:
+        surplus_html = f"""
+  <div class="panel" style="padding:12px 16px;margin-top:14px;">
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-dim);margin-bottom:4px;">Running ahead — capacity to spare</div>
+    {''.join(surplus_rows)}
+  </div>"""
+
+    if not cards and not surplus_html:
         return f"""
 <section class="section">
-  <div class="section-head"><h2>Recommendations</h2>
-  <span class="section-sub">Hire vs. equipment vs. rebalance, sized from today's shift headcount against physical station counts</span></div>
+  <div class="section-head"><h2>Behind &amp; Recommended Actions</h2>
+  <span class="section-sub">Why each flagged station is behind, and whether to hire, add equipment, or rebalance shifts</span></div>
   {summary_line}
-  <div class="panel" style="padding:14px 16px;font-size:12.5px;color:var(--muted);">No hiring, equipment, or shift-rebalance calls today — every at-risk station's headcount already matches its available equipment.</div>
+  <div class="panel" style="padding:14px 16px;font-size:12.5px;color:var(--muted);">Nothing needs a call today — every station's headcount matches its available equipment and queue.</div>
 </section>"""
 
     return f"""
 <section class="section">
-  <div class="section-head"><h2>Recommendations</h2>
-  <span class="section-sub">Hire vs. equipment vs. rebalance, sized from today's shift headcount against physical station counts</span></div>
+  <div class="section-head"><h2>Behind &amp; Recommended Actions</h2>
+  <span class="section-sub">Why each flagged station is behind, and whether to hire, add equipment, or rebalance shifts</span></div>
   {summary_line}
   <div style="font-size:11.5px;color:var(--muted-dim);margin-bottom:14px;">
     Sizing logic: every physical station needs one dedicated operator each shift to hit its full daily equipment
-    capacity (Station Capacity tab). When a station has idle equipment on a shift (more physical units than assigned
-    operator-equivalents) and it's at risk of falling behind, that's a <b>hire</b> or shift-move call. When every
-    available unit already has an operator on both shifts and it's still behind, more staff wouldn't help — that's
-    an <b>equipment</b> call. When one shift is short while the other has spare coverage for the same station,
-    that's a <b>rebalance</b>, not a net-new hire. Stations with more than a handful of small units (e.g. Video's
-    tape decks) are batch-tended, not 1-to-1 — those fall back to the equipment/staffing utilization signal instead
-    of a literal per-unit headcount.
+    capacity (Station Capacity tab). Idle equipment on an at-risk shift is a <b>hire</b> or shift-move call. Every
+    available unit already staffed on both shifts and still behind is an <b>equipment</b> call. One shift short while
+    the other has spare coverage for the same station is a <b>rebalance</b>, not a net-new hire. Stations with more
+    than a handful of small units (e.g. Video's tape decks) are batch-tended, not 1-to-1, and fall back to the
+    equipment/staffing utilization signal instead of a literal per-unit headcount.
   </div>
   <div class="action-grid">{cards}</div>
+  {surplus_html}
 </section>"""
 
 
@@ -895,8 +877,7 @@ SHIFT_WINDOWS_2ND = "3pm-11pm"
 def render_capacity_forecast_tab(d, n):
     groups = d.get("capacity_forecast", [])
     by_name = {g["name"]: g for g in groups}
-    why_html = render_why_behind(d, n)
-    rec_html = render_recommendations_panel(d)
+    actions_html = render_capacity_actions(d, n)
     dept_html = ""
     for dept in FORECAST_DEPT_ORDER:
         names = [name for name, dp in FORECAST_GROUP_DEPT.items() if dp == dept]
@@ -942,6 +923,7 @@ def render_capacity_forecast_tab(d, n):
       <div class="forecast-wrap">{cards}</div>
     </div>"""
     return f"""
+{actions_html}
 <section class="section">
   <div class="section-head"><h2>Capacity &amp; Forecast — Next 4 Weeks</h2>
   <span class="section-sub">Due-date buckets vs. today's staffed output and equipment ceiling &middot; Station Capacity tab</span></div>
@@ -952,8 +934,6 @@ def render_capacity_forecast_tab(d, n):
     clear the entire current queue with room to spare, a signal this station could be overstaffed relative to
     its own backlog or ready to help elsewhere.
   </div>
-  {why_html}
-  {rec_html}
   {dept_html}
 </section>
 """
@@ -1041,7 +1021,7 @@ def main():
   <button class="tabbtn" onclick="showTab('tab-staffing', this)">Staffing</button>
   <button class="tabbtn" onclick="showTab('tab-late-orders', this)">Late Orders</button>
   <button class="tabbtn" onclick="showTab('tab-forecast', this)">Capacity &amp; Forecast</button>
-  <button class="tabbtn" onclick="showTab('tab-overview', this)">Overview &amp; AI Insights</button>
+  <button class="tabbtn" onclick="showTab('tab-overview', this)">Floor Notes</button>
 </div>
 
 <div id="tab-today" class="tabpanel active">{today_body}</div>
