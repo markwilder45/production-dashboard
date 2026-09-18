@@ -1373,5 +1373,53 @@
         ]
       }
     ]
+  },
+  {
+    "date": "2026-09-18",
+    "backlog_total": 457504.0,
+    "avg_10d_inbound": 14441.0,
+    "avg_10d_output": 19995.0,
+    "groups": {
+      "Negatives": {
+        "late": 4682.0,
+        "total_queue": 97083.0,
+        "week1_status": "on_track"
+      },
+      "Slides": {
+        "late": 13575.0,
+        "total_queue": 134796.0,
+        "week1_status": "at_risk_late"
+      },
+      "Paper": {
+        "late": 2957.0,
+        "total_queue": 130331.0,
+        "week1_status": "on_track"
+      },
+      "Special": {
+        "late": 224.0,
+        "total_queue": 4997.0,
+        "week1_status": "at_risk_late"
+      },
+      "Film Splice": {
+        "late": 8450.0,
+        "total_queue": 91429.0,
+        "week1_status": "at_risk_late"
+      },
+      "Film Capture": {
+        "late": 8450.0,
+        "total_queue": 91429.0,
+        "week1_status": "at_risk_late"
+      },
+      "Film Edit": {
+        "late": 16960.0,
+        "total_queue": 99939.0,
+        "week1_status": "at_risk_late"
+      },
+      "Video": {
+        "late": 0,
+        "total_queue": 0,
+        "week1_status": "on_track"
+      }
+    }
   }
 ]
